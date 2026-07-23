@@ -383,8 +383,20 @@ button {
   min-width: 0;
 }
 
+.range-edit-actions {
+  @apply mt-4 grid gap-2;
+}
+
+.range-edit-actions.with-cancel {
+  @apply grid-cols-2;
+}
+
+.confirm-range-button,
+.cancel-range-button {
+  @apply flex h-11 w-full items-center justify-center gap-2 rounded-md border px-4 text-sm font-semibold transition;
+}
+
 .confirm-range-button {
-  @apply mt-4 flex h-11 w-full items-center justify-center gap-2 rounded-md border px-4 text-sm font-semibold transition;
   border-color: rgba(56, 200, 204, 0.34);
   background: rgba(56, 200, 204, 0.14);
   color: var(--mint);
@@ -393,6 +405,18 @@ button {
 .confirm-range-button:hover {
   border-color: rgba(164, 236, 212, 0.68);
   background: rgba(56, 200, 204, 0.2);
+}
+
+.cancel-range-button {
+  border-color: rgba(247, 255, 252, 0.14);
+  background: rgba(255, 255, 255, 0.05);
+  color: rgba(247, 255, 252, 0.68);
+}
+
+.cancel-range-button:hover {
+  border-color: rgba(234, 116, 116, 0.42);
+  background: rgba(234, 116, 116, 0.1);
+  color: #ffd2d2;
 }
 
 .add-range-button {
