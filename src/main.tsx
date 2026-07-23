@@ -302,6 +302,7 @@ function App() {
   const [pendingVoterName, setPendingVoterName] = useState("");
   const [canPlay, setCanPlay] = useState<boolean | null>(null);
   const [ranges, setRanges] = useState<Range[]>([DEFAULT_RANGE]);
+  const [savedRanges, setSavedRanges] = useState<Range[]>([]);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
@@ -334,18 +335,26 @@ function App() {
     if (!voterName) {
       setCanPlay(null);
       setRanges([DEFAULT_RANGE]);
+      setSavedRanges([]);
       return;
     }
 
     if (currentVote) {
       setCanPlay(currentVote.canPlay);
-      setRanges(currentVote.ranges.length ? currentVote.ranges : [DEFAULT_RANGE]);
-      setCollapsedRanges({});
+      const loadedRanges = currentVote.ranges.length ? currentVote.ranges : [DEFAULT_RANGE];
+      setRanges(loadedRanges);
+      setSavedRanges(currentVote.ranges);
+      setCollapsedRanges(
+        currentVote.canPlay
+          ? Object.fromEntries(loadedRanges.map((_, index) => [index, true]))
+          : {},
+      );
       return;
     }
 
     setCanPlay(null);
     setRanges([DEFAULT_RANGE]);
+    setSavedRanges([]);
     setCollapsedRanges({});
   }, [currentVote, voterName]);
 
@@ -389,6 +398,23 @@ function App() {
   function resetRange(index: number) {
     setRanges((items) => items.map((item, itemIndex) => (itemIndex === index ? DEFAULT_RANGE : item)));
     setCollapsedRanges((items) => ({ ...items, [index]: false }));
+    setDialModes((items) => ({
+      ...items,
+      [`${index}-start`]: "hour",
+      [`${index}-end`]: "hour",
+    }));
+    setActiveRangeFields((items) => ({ ...items, [index]: "start" }));
+  }
+
+  function cancelRangeEdit(index: number) {
+    const savedRange = savedRanges[index];
+    setError("");
+    if (!savedRange) {
+      resetRange(index);
+      return;
+    }
+    setRanges((items) => items.map((item, itemIndex) => (itemIndex === index ? savedRange : item)));
+    setCollapsedRanges((items) => ({ ...items, [index]: true }));
     setDialModes((items) => ({
       ...items,
       [`${index}-start`]: "hour",
@@ -443,6 +469,10 @@ function App() {
       }
       const savedSummary = await saveAppVote(voterName, canPlay, usableRanges);
       setSummary(savedSummary);
+      setSavedRanges(usableRanges);
+      if (canPlay) {
+        setCollapsedRanges(Object.fromEntries(usableRanges.map((_, index) => [index, true])));
+      }
     } catch (err) {
       setError(err instanceof Error ? err.message : "No se pudo guardar tu voto");
     } finally {
@@ -546,6 +576,8 @@ function App() {
                       collapsed={Boolean(collapsedRanges[index])}
                       onConfirm={confirmRange}
                       onEdit={editRange}
+                      onCancel={cancelRangeEdit}
+                      canCancel={Boolean(savedRanges[index])}
                     />
                   ))}
                   <button className="add-range-button" onClick={addRange} title="Agregar otro rango">
@@ -566,8 +598,8 @@ function App() {
 
             {voterName && canPlay !== null ? (
               <button className="primary-button w-full" onClick={saveVote} disabled={saving || !canSave}>
-                {saving ? <Loader2 className="animate-spin" size={18} /> : currentVote ? <Pencil size={18} /> : <Save size={18} />}
-                {currentVote ? "ACTUALIZAR VOTO" : "GUARDAR VOTO"}
+                {saving ? <Loader2 className="animate-spin" size={18} /> : <Save size={18} />}
+                GUARDAR VOTO
               </button>
             ) : null}
           </div>
@@ -626,6 +658,8 @@ function RangeEditor({
   collapsed,
   onConfirm,
   onEdit,
+  onCancel,
+  canCancel,
 }: {
   index: number;
   range: Range;
@@ -641,6 +675,8 @@ function RangeEditor({
   collapsed: boolean;
   onConfirm: (index: number) => void;
   onEdit: (index: number) => void;
+  onCancel: (index: number) => void;
+  canCancel: boolean;
 }) {
   const startDate = date ? formatShortDate(date) : "hoy";
   const endDate = date ? formatShortDate(range.end === "24:00" ? addDays(date, 1) : date) : "hoy";
@@ -700,10 +736,18 @@ function RangeEditor({
         onDialModeChange={(nextMode) => onDialModeChange(index, activeField, nextMode)}
         onChange={(value) => onChange(index, activeField, value)}
       />
-      <button className="confirm-range-button" onClick={() => onConfirm(index)}>
-        <Check size={17} />
-        CONFIRMAR RANGO
-      </button>
+      <div className={`range-edit-actions ${canCancel ? "with-cancel" : ""}`}>
+        {canCancel ? (
+          <button className="cancel-range-button" onClick={() => onCancel(index)}>
+            <X size={17} />
+            CANCELAR
+          </button>
+        ) : null}
+        <button className="confirm-range-button" onClick={() => onConfirm(index)}>
+          <Check size={17} />
+          CONFIRMAR RANGO
+        </button>
+      </div>
     </article>
   );
 }
