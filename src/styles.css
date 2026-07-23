@@ -1,0 +1,671 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@font-face {
+  font-family: "Neonblitz";
+  src: url("./assets/fonts/Neonblitz.ttf") format("truetype");
+  font-weight: 400;
+  font-style: normal;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: "ArcadeUsers";
+  src: url("./assets/fonts/ARCADE.TTF") format("truetype");
+  font-weight: 400;
+  font-style: normal;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: "ArcadePixel";
+  src: url("./assets/fonts/ARCADEPI.TTF") format("truetype");
+  font-weight: 400;
+  font-style: normal;
+  font-display: swap;
+}
+
+:root {
+  color-scheme: dark;
+  font-family: "ArcadePixel", Inter, ui-sans-serif, system-ui, sans-serif;
+  --mint: #a4ecd4;
+  --cyan: #38c8cc;
+  --ink: #434169;
+  --blue: #357ea7;
+  --coral: #ea7474;
+  --magenta: #ff4fd8;
+  --night: #252440;
+  --panel: #343255;
+  --arcade-font: "Neonblitz", "OCR A Extended", "Lucida Console", monospace;
+}
+
+body {
+  margin: 0;
+  background: var(--night);
+  letter-spacing: 0.035em;
+}
+
+button,
+input,
+select {
+  font: inherit;
+}
+
+button {
+  -webkit-tap-highlight-color: transparent;
+}
+
+.app-shell {
+  min-height: 100vh;
+  background:
+    radial-gradient(circle at 16% -10%, rgba(56, 200, 204, 0.22), transparent 28%),
+    linear-gradient(180deg, #434169 0%, #2b2a49 48%, #23223d 100%);
+  color: #f7fffc;
+}
+
+.topbar-inner {
+  @apply mx-auto flex max-w-6xl flex-col gap-4 px-4 pb-7 pt-6 sm:flex-row sm:items-center sm:justify-between;
+}
+
+.topbar h1 {
+  @apply mt-4 pl-3 text-base font-semibold tracking-normal sm:text-lg;
+  color: rgba(247, 255, 252, 0.9);
+  letter-spacing: 0.08em;
+  text-shadow:
+    1px 0 0 rgba(56, 200, 204, 0.72),
+    -1px 0 0 rgba(164, 236, 212, 0.28),
+    0 0 8px rgba(56, 200, 204, 0.3),
+    0 0 16px rgba(164, 236, 212, 0.16);
+}
+
+.eyebrow {
+  @apply inline-block rounded-lg border px-3 py-2 text-2xl font-black uppercase tracking-[0.08em] sm:text-4xl;
+  font-family: var(--arcade-font);
+  line-height: 1.05;
+  color: var(--mint);
+  border-color: rgba(255, 79, 216, 0.86);
+  background: rgba(37, 36, 64, 0.42);
+  box-shadow:
+    0 0 0 1px rgba(255, 79, 216, 0.22) inset,
+    0 0 10px rgba(255, 79, 216, 0.56),
+    0 0 24px rgba(255, 79, 216, 0.28);
+  text-shadow:
+    1px 0 0 rgba(255, 79, 216, 0.92),
+    0 1px 0 rgba(255, 79, 216, 0.92),
+    2px 2px 0 rgba(37, 36, 64, 1),
+    0 0 8px rgba(164, 236, 212, 0.82),
+    0 0 16px rgba(56, 200, 204, 0.48);
+  -webkit-font-smoothing: none;
+  font-smooth: never;
+}
+
+.meta-row {
+  @apply mt-4 flex flex-wrap items-center gap-2 text-xs;
+  color: rgba(247, 255, 252, 0.72);
+  letter-spacing: 0.045em;
+}
+
+.meta-row span {
+  @apply inline-flex items-center gap-2 rounded-md px-3 py-1.5;
+  background: rgba(255, 255, 255, 0.08);
+  border: 1px solid rgba(164, 236, 212, 0.12);
+}
+
+.content-grid {
+  @apply mx-auto grid max-w-6xl gap-5 px-4 pb-8 lg:grid-cols-[minmax(400px,420px)_minmax(0,1fr)];
+}
+
+.panel {
+  @apply rounded-lg border p-5;
+  min-width: 0;
+  background: rgba(52, 50, 85, 0.82);
+  border-color: rgba(164, 236, 212, 0.14);
+  box-shadow: 0 24px 70px rgba(17, 16, 31, 0.28);
+  backdrop-filter: blur(18px);
+}
+
+.vote-panel {
+  @apply space-y-5;
+}
+
+.panel-title {
+  @apply mb-3 flex items-center gap-2 text-base font-semibold;
+  color: #ffffff;
+  letter-spacing: 0.07em;
+}
+
+.step-title > span {
+  @apply inline-flex h-6 w-6 items-center justify-center rounded-full text-xs font-bold;
+  background: rgba(56, 200, 204, 0.2);
+  color: var(--mint);
+}
+
+.step-block {
+  @apply border-t pt-5;
+  border-color: rgba(164, 236, 212, 0.12);
+}
+
+.section-heading {
+  @apply flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between;
+}
+
+.section-heading span {
+  @apply w-fit rounded-md px-3 py-1 text-sm font-semibold;
+  background: rgba(56, 200, 204, 0.16);
+  color: var(--mint);
+}
+
+.icon-button {
+  @apply inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-md border transition disabled:cursor-not-allowed disabled:opacity-35;
+  border-color: rgba(164, 236, 212, 0.18);
+  background: rgba(255, 255, 255, 0.07);
+  color: #ffffff;
+}
+
+.icon-button:hover:not(:disabled) {
+  border-color: rgba(56, 200, 204, 0.7);
+  color: var(--mint);
+}
+
+.icon-button.small {
+  @apply h-8 w-8;
+}
+
+.danger-button {
+  border-color: rgba(234, 116, 116, 0.26);
+  background: rgba(234, 116, 116, 0.1);
+  color: #ffaaaa;
+}
+
+.danger-button:hover:not(:disabled) {
+  border-color: rgba(234, 116, 116, 0.72);
+  background: rgba(234, 116, 116, 0.18);
+  color: #ffd2d2;
+}
+
+.primary-button,
+.secondary-button {
+  @apply inline-flex h-11 items-center justify-center gap-2 rounded-md px-4 font-semibold transition disabled:cursor-not-allowed disabled:opacity-60;
+}
+
+.primary-button {
+  background: linear-gradient(135deg, var(--cyan), var(--mint));
+  color: #172437;
+  box-shadow: 0 16px 32px rgba(56, 200, 204, 0.18);
+}
+
+.primary-button:hover:not(:disabled) {
+  transform: translateY(-1px);
+  box-shadow: 0 18px 40px rgba(56, 200, 204, 0.24);
+}
+
+.secondary-button {
+  border: 1px solid rgba(164, 236, 212, 0.2);
+  background: rgba(255, 255, 255, 0.06);
+  color: var(--mint);
+}
+
+.secondary-button:hover {
+  border-color: rgba(56, 200, 204, 0.72);
+  background: rgba(56, 200, 204, 0.12);
+}
+
+.voter-grid {
+  @apply grid grid-cols-2 gap-2;
+}
+
+.voter-button {
+  @apply flex h-14 items-center justify-between rounded-md border px-3 text-left text-2xl font-semibold transition;
+  font-family: "ArcadeUsers", "ArcadePixel", monospace;
+  letter-spacing: 0.04em;
+  border-color: rgba(164, 236, 212, 0.14);
+  background: rgba(255, 255, 255, 0.06);
+  color: rgba(247, 255, 252, 0.78);
+}
+
+.voter-button span {
+  text-shadow:
+    1px 0 0 rgba(255, 79, 216, 0.62),
+    0 0 8px rgba(255, 79, 216, 0.18);
+}
+
+.voter-button:hover {
+  border-color: rgba(56, 200, 204, 0.62);
+}
+
+.voter-button.active {
+  background: rgba(56, 200, 204, 0.2);
+  border-color: var(--cyan);
+  color: white;
+  box-shadow: inset 0 0 0 1px rgba(164, 236, 212, 0.12);
+}
+
+.voter-button.active span {
+  text-shadow:
+    1px 0 0 rgba(255, 79, 216, 0.95),
+    -1px 0 0 rgba(56, 200, 204, 0.8),
+    0 0 10px rgba(255, 79, 216, 0.42),
+    0 0 14px rgba(56, 200, 204, 0.22);
+}
+
+.voter-button.pending {
+  border-color: rgba(255, 79, 216, 0.72);
+  background: rgba(255, 79, 216, 0.12);
+  color: white;
+  box-shadow: 0 0 12px rgba(255, 79, 216, 0.18);
+}
+
+.voter-confirm {
+  @apply mt-3 rounded-md border p-3;
+  border-color: rgba(164, 236, 212, 0.2);
+  background: rgba(18, 18, 33, 0.34);
+}
+
+.voter-confirm p {
+  @apply text-sm font-semibold;
+  color: rgba(247, 255, 252, 0.86);
+}
+
+.voter-confirm div {
+  @apply mt-3 grid grid-cols-2 gap-2;
+}
+
+.voter-confirm button {
+  @apply h-10 rounded-md border px-3 text-xs font-semibold transition;
+  border-color: rgba(164, 236, 212, 0.16);
+  background: rgba(255, 255, 255, 0.06);
+  color: rgba(247, 255, 252, 0.72);
+}
+
+.voter-confirm button:first-child {
+  border-color: rgba(56, 200, 204, 0.58);
+  background: rgba(56, 200, 204, 0.16);
+  color: var(--mint);
+}
+
+.segmented {
+  @apply grid grid-cols-2 rounded-md p-1;
+  background: rgba(18, 18, 33, 0.42);
+}
+
+.segmented button {
+  @apply h-10 rounded px-3 text-sm font-semibold transition;
+  color: rgba(247, 255, 252, 0.58);
+}
+
+.segmented button.active {
+  background: rgba(255, 255, 255, 0.1);
+  color: var(--mint);
+}
+
+.segmented button.active.danger {
+  color: #ffd2d2;
+  background: rgba(234, 116, 116, 0.18);
+}
+
+.range-card {
+  @apply rounded-lg border p-4;
+  min-width: 0;
+  border-color: rgba(164, 236, 212, 0.12);
+  background: rgba(22, 22, 40, 0.34);
+}
+
+.range-card-collapsed {
+  @apply flex items-center justify-between gap-3 py-3;
+  background: rgba(56, 200, 204, 0.08);
+}
+
+.range-card-header {
+  @apply mb-4 flex items-center justify-between gap-3;
+}
+
+.range-card-header strong {
+  @apply text-sm;
+  color: rgba(247, 255, 252, 0.9);
+}
+
+.range-actions {
+  @apply flex justify-end gap-1;
+}
+
+.range-collapsed-summary {
+  @apply min-w-0 flex-1 rounded-md px-2 py-1 text-left transition;
+}
+
+.range-collapsed-summary:hover {
+  background: rgba(255, 255, 255, 0.05);
+}
+
+.range-collapsed-summary span {
+  @apply block text-xs font-semibold;
+  color: rgba(247, 255, 252, 0.68);
+}
+
+.range-collapsed-summary strong {
+  @apply mt-1 block truncate text-sm font-semibold tabular-nums;
+  color: var(--mint);
+}
+
+.range-time-switcher {
+  @apply mb-3 grid grid-cols-2 gap-2;
+}
+
+.range-time-switcher button {
+  @apply min-w-0 rounded-md border px-3 py-2 text-left transition;
+  border-color: rgba(164, 236, 212, 0.12);
+  background: rgba(255, 255, 255, 0.05);
+}
+
+.range-time-switcher button.active {
+  border-color: rgba(56, 200, 204, 0.62);
+  background: rgba(56, 200, 204, 0.15);
+  box-shadow: 0 0 0 1px rgba(56, 200, 204, 0.16) inset;
+}
+
+.range-time-switcher span {
+  @apply flex items-center justify-between gap-2 text-[10px] font-semibold uppercase tracking-[0.14em];
+  color: rgba(247, 255, 252, 0.48);
+}
+
+.range-time-switcher strong {
+  @apply mt-1 block truncate text-lg font-semibold tabular-nums;
+  color: white;
+}
+
+.range-time-switcher small {
+  @apply text-[10px] font-semibold tracking-normal;
+  color: rgba(164, 236, 212, 0.68);
+}
+
+.time-picker {
+  @apply relative p-0;
+  min-width: 0;
+}
+
+.confirm-range-button {
+  @apply mt-4 flex h-11 w-full items-center justify-center gap-2 rounded-md border px-4 text-sm font-semibold transition;
+  border-color: rgba(56, 200, 204, 0.34);
+  background: rgba(56, 200, 204, 0.14);
+  color: var(--mint);
+}
+
+.confirm-range-button:hover {
+  border-color: rgba(164, 236, 212, 0.68);
+  background: rgba(56, 200, 204, 0.2);
+}
+
+.add-range-button {
+  @apply flex h-11 w-11 items-center justify-center rounded-md border transition;
+  border-color: rgba(164, 236, 212, 0.24);
+  background: rgba(255, 255, 255, 0.06);
+  color: var(--mint);
+}
+
+.add-range-button:hover {
+  border-color: rgba(56, 200, 204, 0.72);
+  background: rgba(56, 200, 204, 0.14);
+}
+
+.time-label {
+  @apply mb-2 flex items-center justify-between gap-2 text-[11px] font-semibold uppercase tracking-[0.12em];
+  color: rgba(247, 255, 252, 0.48);
+}
+
+.time-label small {
+  @apply text-[10px] font-semibold tracking-normal;
+  color: rgba(164, 236, 212, 0.68);
+}
+
+.clock-readout {
+  @apply mb-4 flex min-h-14 items-center justify-center gap-2 rounded-md px-3 py-4 tabular-nums sm:px-5;
+  background: rgba(18, 18, 33, 0.34);
+  color: white;
+}
+
+.clock-readout button {
+  @apply min-w-16 rounded px-2 py-1.5 text-lg font-semibold leading-none transition disabled:cursor-not-allowed disabled:opacity-35 sm:px-3 sm:text-2xl;
+  color: rgba(247, 255, 252, 0.64);
+}
+
+.clock-readout button:hover:not(:disabled) {
+  background: rgba(56, 200, 204, 0.12);
+  color: white;
+}
+
+.clock-readout button.active {
+  background: rgba(56, 200, 204, 0.18);
+  color: var(--mint);
+  box-shadow: 0 0 0 1px rgba(56, 200, 204, 0.16) inset;
+}
+
+.clock-readout span {
+  @apply text-2xl font-semibold leading-none;
+  color: var(--cyan);
+}
+
+.clock-readout small {
+  @apply text-xs font-semibold uppercase;
+  color: rgba(164, 236, 212, 0.7);
+}
+
+.clock-face {
+  @apply relative mx-auto rounded-full border;
+  width: min(100%, 17.5rem);
+  aspect-ratio: 1;
+  isolation: isolate;
+  border-color: rgba(164, 236, 212, 0.22);
+  background:
+    radial-gradient(circle, rgba(255, 255, 255, 0.03) 0 18%, transparent 18.5%),
+    radial-gradient(circle, rgba(18, 18, 33, 0.2) 0 100%);
+  box-shadow:
+    inset 0 0 28px rgba(18, 18, 33, 0.48),
+    inset 0 0 0 1px rgba(56, 200, 204, 0.08),
+    0 10px 24px rgba(18, 18, 33, 0.16);
+}
+
+.clock-face::before,
+.clock-face::after {
+  @apply pointer-events-none absolute rounded-full;
+  content: "";
+  inset: 9px;
+  z-index: 0;
+  -webkit-mask: radial-gradient(circle, transparent 0 87%, #000 87.5% 100%);
+  mask: radial-gradient(circle, transparent 0 87%, #000 87.5% 100%);
+}
+
+.clock-face.hour::before,
+.clock-face.minute::before {
+  background: repeating-conic-gradient(
+    from -0.4deg,
+    rgba(164, 236, 212, 0.22) 0deg 0.8deg,
+    transparent 0.8deg 6deg
+  );
+}
+
+.clock-face.hour::after,
+.clock-face.minute::after {
+  background: repeating-conic-gradient(
+    from -1deg,
+    rgba(164, 236, 212, 0.5) 0deg 2deg,
+    transparent 2deg 30deg
+  );
+}
+
+.clock-marker {
+  @apply pointer-events-none absolute left-1/2 top-1/2 block origin-center;
+  z-index: 1;
+  width: 5px;
+  height: 24px;
+  margin-left: -2.5px;
+  margin-top: -12px;
+  border-radius: 999px;
+  background: rgba(247, 255, 252, 0.92);
+  box-shadow: 0 0 8px rgba(164, 236, 212, 0.34);
+  transform: rotate(var(--angle)) translateY(-7.35rem);
+}
+
+.clock-marker.major {
+  height: 24px;
+}
+
+.clock-face.hour .clock-marker.major,
+.clock-face.minute .clock-marker.major {
+  height: 20px;
+  width: 4px;
+  margin-left: -2px;
+  margin-top: -10px;
+  transform: rotate(var(--angle)) translateY(-7.25rem);
+}
+
+.clock-marker.minor {
+  height: 9px;
+  width: 2px;
+  margin-left: -1px;
+  margin-top: -4.5px;
+  background: rgba(247, 255, 252, 0.48);
+  box-shadow: none;
+  transform: rotate(var(--angle)) translateY(-7.1rem);
+}
+
+.clock-hand {
+  @apply absolute left-1/2 top-1/2 origin-bottom rounded-full transition-transform duration-300;
+  width: 2px;
+  height: 36%;
+  margin-left: -1px;
+  margin-top: -36%;
+  background: var(--cyan);
+  box-shadow: none;
+}
+
+.clock-hand.short {
+  height: 21%;
+  margin-top: -21%;
+}
+
+.clock-hand.long {
+  height: 36%;
+  margin-top: -36%;
+}
+
+.clock-hand.idle {
+  opacity: 0;
+}
+
+.clock-center {
+  @apply absolute left-1/2 top-1/2 z-10 h-3 w-3 -translate-x-1/2 -translate-y-1/2 rounded-full;
+  background: var(--mint);
+  box-shadow: 0 0 12px rgba(164, 236, 212, 0.64);
+}
+
+.clock-option {
+  @apply absolute z-20 flex h-8 w-8 -translate-x-1/2 -translate-y-1/2 items-center justify-center rounded-full text-xs font-bold tabular-nums transition disabled:cursor-not-allowed disabled:opacity-25;
+  background: rgba(255, 255, 255, 0.1);
+  color: rgba(247, 255, 252, 0.82);
+  box-shadow: 0 0 0 1px rgba(255, 255, 255, 0.035) inset;
+}
+
+.clock-option.inner {
+  @apply h-6 w-6 text-[10px];
+  background: rgba(56, 200, 204, 0.16);
+  color: rgba(164, 236, 212, 0.86);
+  box-shadow: 0 0 10px rgba(56, 200, 204, 0.08);
+}
+
+.clock-option:hover:not(:disabled) {
+  background: rgba(56, 200, 204, 0.2);
+  color: white;
+}
+
+.clock-option.selected {
+  background: var(--cyan);
+  color: #172437;
+  box-shadow: 0 0 12px rgba(56, 200, 204, 0.38);
+}
+
+.notice {
+  @apply flex items-start gap-2 rounded-md border p-3 text-sm font-medium;
+  border-color: rgba(234, 116, 116, 0.26);
+  background: rgba(234, 116, 116, 0.12);
+  color: #ffd2d2;
+}
+
+.error-text {
+  @apply rounded-md border px-3 py-2 text-sm font-medium;
+  border-color: rgba(234, 116, 116, 0.34);
+  background: rgba(234, 116, 116, 0.14);
+  color: #ffd2d2;
+}
+
+.empty-state {
+  @apply rounded-md border border-dashed p-4 text-sm;
+  border-color: rgba(164, 236, 212, 0.18);
+  background: rgba(255, 255, 255, 0.04);
+  color: rgba(247, 255, 252, 0.58);
+}
+
+.vote-card {
+  @apply flex flex-col gap-3 rounded-lg border p-4;
+  border-color: rgba(164, 236, 212, 0.12);
+  background: rgba(255, 255, 255, 0.05);
+}
+
+.vote-card-header {
+  @apply flex flex-col gap-1 sm:flex-row sm:items-start sm:justify-between;
+}
+
+.vote-card h3 {
+  @apply text-lg font-semibold;
+  font-family: "ArcadeUsers", "ArcadePixel", monospace;
+  color: white;
+}
+
+.vote-card p {
+  @apply text-xs;
+  color: rgba(247, 255, 252, 0.45);
+}
+
+.range-list {
+  @apply flex flex-wrap gap-2;
+}
+
+.range-list span {
+  @apply rounded-md px-3 py-2 text-sm font-semibold;
+  background: rgba(56, 200, 204, 0.14);
+  color: var(--mint);
+}
+
+.cannot-play {
+  @apply inline-flex w-fit rounded-md px-3 py-2 text-sm font-semibold;
+  background: rgba(234, 116, 116, 0.14);
+  color: #ffd2d2;
+}
+
+.overlap-row {
+  @apply flex flex-col gap-1 rounded-lg border p-4 sm:flex-row sm:items-center sm:justify-between;
+  border-color: rgba(56, 200, 204, 0.34);
+  background: rgba(56, 200, 204, 0.13);
+  color: white;
+}
+
+.overlap-row span {
+  @apply text-sm font-medium;
+  color: var(--mint);
+}
+
+@media (max-width: 520px) {
+  .content-grid {
+    @apply px-3;
+  }
+
+  .time-grid {
+    @apply grid-cols-1;
+  }
+
+}
+
+@media (max-width: 1080px) {
+  .content-grid {
+    @apply lg:grid-cols-1;
+  }
+}

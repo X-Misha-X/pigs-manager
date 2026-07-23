@@ -1,0 +1,9 @@
+node_modules/
+dist/
+__pycache__/
+*.pyc
+survey.db
+.env
+.env.local
+.env.*.local
+.codex-remote-attachments/
