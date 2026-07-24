@@ -1,10 +1,12 @@
 from __future__ import annotations
 
 import json
+import os
 import re
 import sqlite3
 from datetime import datetime
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
+from itertools import combinations
 from pathlib import Path
 from typing import Any
 from zoneinfo import ZoneInfo
@@ -14,6 +16,7 @@ ROOT = Path(__file__).parent
 DB_PATH = ROOT / "survey.db"
 TIMEZONE = ZoneInfo("America/Argentina/Buenos_Aires")
 TIME_PATTERN = re.compile(r"^(?:[01]\d|2[0-3]):(?:00|05|10|15|20|25|30|35|40|45|50|55)$|^24:00$")
+ADMIN_PIN = os.environ.get("VITE_ADMIN_PIN", "")
 
 
 def today_buenos_aires() -> str:
@@ -103,38 +106,52 @@ def get_votes(date: str) -> list[dict[str, Any]]:
 
 
 def calculate_overlaps(votes: list[dict[str, Any]]) -> list[dict[str, Any]]:
-    events: dict[tuple[int, int], set[str]] = {}
-    for vote in votes:
-        if not vote["canPlay"]:
-            continue
-        for range_item in vote["ranges"]:
-            start = time_to_minutes(range_item["start"])
-            end = time_to_minutes(range_item["end"])
-            for minute in range(start, end, 5):
-                events.setdefault((minute, minute + 5), set()).add(vote["voter"])
-
+    playable_votes = [vote for vote in votes if vote["canPlay"] and vote["ranges"]]
     overlaps = []
-    active_voters: tuple[str, ...] | None = None
-    active_start: int | None = None
-    active_end: int | None = None
 
-    for (start, end), voters in sorted(events.items()):
-        voter_tuple = tuple(sorted(voters))
-        if len(voter_tuple) < 2:
+    for size in range(2, len(playable_votes) + 1):
+        for group in combinations(playable_votes, size):
+            first_vote, *other_votes = group
+            intervals = [
+                (time_to_minutes(range_item["start"]), time_to_minutes(range_item["end"]))
+                for range_item in first_vote["ranges"]
+            ]
+            for vote in other_votes:
+                intervals = intersect_ranges(intervals, vote["ranges"])
+            voters = tuple(sorted(vote["voter"] for vote in group))
+            for start, end in merge_intervals(intervals):
+                overlaps.append(to_overlap(start, end, voters))
+
+    return sorted(
+        overlaps,
+        key=lambda overlap: (
+            -len(overlap["voters"]),
+            -(time_to_minutes(overlap["end"]) - time_to_minutes(overlap["start"])),
+            time_to_minutes(overlap["start"]),
+        ),
+    )
+
+
+def intersect_ranges(intervals: list[tuple[int, int]], ranges: list[dict[str, str]]) -> list[tuple[int, int]]:
+    intersections = []
+    for current_start, current_end in intervals:
+        for range_item in ranges:
+            start = max(current_start, time_to_minutes(range_item["start"]))
+            end = min(current_end, time_to_minutes(range_item["end"]))
+            if end > start:
+                intersections.append((start, end))
+    return intersections
+
+
+def merge_intervals(intervals: list[tuple[int, int]]) -> list[tuple[int, int]]:
+    merged: list[tuple[int, int]] = []
+    for start, end in sorted(intervals):
+        if merged and start <= merged[-1][1]:
+            previous_start, previous_end = merged[-1]
+            merged[-1] = (previous_start, max(previous_end, end))
             continue
-        if active_voters == voter_tuple and active_end == start:
-            active_end = end
-            continue
-        if active_voters and active_start is not None and active_end is not None:
-            overlaps.append(to_overlap(active_start, active_end, active_voters))
-        active_voters = voter_tuple
-        active_start = start
-        active_end = end
-
-    if active_voters and active_start is not None and active_end is not None:
-        overlaps.append(to_overlap(active_start, active_end, active_voters))
-
-    return overlaps
+        merged.append((start, end))
+    return merged
 
 
 def minutes_to_time(value: int) -> str:
@@ -206,6 +223,24 @@ class SurveyHandler(BaseHTTPRequestHandler):
             self.send_json(summary())
         except ValueError as error:
             self.send_json({"error": str(error)}, status=400)
+        except json.JSONDecodeError:
+            self.send_json({"error": "El cuerpo de la solicitud no es JSON valido."}, status=400)
+
+    def do_DELETE(self) -> None:
+        if self.path != "/api/votes/today":
+            self.send_error(404)
+            return
+
+        try:
+            payload = self.read_json()
+            if not ADMIN_PIN or payload.get("pin") != ADMIN_PIN:
+                self.send_json({"error": "PIN incorrecto."}, status=403)
+                return
+
+            with connect() as db:
+                db.execute("DELETE FROM votes WHERE date = ?", (today_buenos_aires(),))
+
+            self.send_json(summary())
         except json.JSONDecodeError:
             self.send_json({"error": "El cuerpo de la solicitud no es JSON valido."}, status=400)
 

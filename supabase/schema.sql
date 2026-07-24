@@ -29,3 +29,8 @@ on public.votes
 for update
 using (true)
 with check (true);
+
+create policy "Public can delete votes"
+on public.votes
+for delete
+using (true);

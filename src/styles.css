@@ -211,6 +211,55 @@ button {
   background: rgba(56, 200, 204, 0.12);
 }
 
+.admin-wrap {
+  @apply relative self-start sm:self-auto;
+}
+
+.admin-toggle {
+  @apply h-10 text-xs;
+}
+
+.admin-panel {
+  @apply absolute right-0 top-12 z-40 grid w-64 gap-3 rounded-lg border p-4 text-sm;
+  background: rgba(37, 36, 64, 0.96);
+  border-color: rgba(164, 236, 212, 0.18);
+  box-shadow: 0 22px 46px rgba(17, 16, 31, 0.42);
+}
+
+.admin-panel label {
+  @apply text-xs font-semibold uppercase;
+  color: rgba(247, 255, 252, 0.62);
+  letter-spacing: 0.12em;
+}
+
+.admin-panel input {
+  @apply h-10 rounded-md border px-3 outline-none;
+  background: rgba(18, 18, 33, 0.82);
+  border-color: rgba(164, 236, 212, 0.16);
+  color: white;
+}
+
+.admin-panel input:focus {
+  border-color: rgba(56, 200, 204, 0.72);
+}
+
+.admin-panel p {
+  @apply text-xs;
+  color: #ffd2d2;
+}
+
+.danger-admin-button {
+  @apply inline-flex min-h-11 items-center justify-center gap-2 rounded-md border px-4 text-sm font-semibold transition disabled:cursor-not-allowed disabled:opacity-60;
+  border-color: rgba(234, 116, 116, 0.42);
+  background: rgba(234, 116, 116, 0.16);
+  color: #ffd2d2;
+}
+
+.danger-admin-button:hover:not(:disabled) {
+  border-color: rgba(234, 116, 116, 0.78);
+  background: rgba(234, 116, 116, 0.24);
+}
+
 .voter-grid {
   @apply grid grid-cols-2 gap-2;
 }
@@ -663,6 +712,45 @@ button {
   @apply inline-flex w-fit rounded-md px-3 py-2 text-sm font-semibold;
   background: rgba(234, 116, 116, 0.14);
   color: #ffd2d2;
+}
+
+.overlap-filter {
+  @apply mt-3 flex flex-wrap items-center gap-2;
+}
+
+.overlap-filter > span {
+  @apply mr-1 text-xs font-semibold uppercase;
+  color: rgba(247, 255, 252, 0.58);
+  letter-spacing: 0.08em;
+}
+
+.overlap-filter button {
+  @apply min-h-9 rounded-md border px-3 text-xs font-semibold uppercase transition;
+  border-color: rgba(164, 236, 212, 0.14);
+  background: rgba(255, 255, 255, 0.05);
+  color: rgba(247, 255, 252, 0.66);
+}
+
+.overlap-filter button:hover {
+  border-color: rgba(56, 200, 204, 0.64);
+  color: white;
+}
+
+.overlap-filter button.active {
+  border-color: rgba(56, 200, 204, 0.9);
+  background: rgba(56, 200, 204, 0.18);
+  color: var(--mint);
+}
+
+.overlap-filter button.clear-filter {
+  border-color: rgba(255, 79, 216, 0.34);
+  background: rgba(255, 79, 216, 0.1);
+  color: #ffd4f6;
+}
+
+.overlap-list {
+  min-height: 13rem;
+  align-content: start;
 }
 
 .overlap-row {

@@ -54,6 +54,7 @@ type SupabaseVoteRow = {
 const API_BASE = import.meta.env.DEV ? "http://127.0.0.1:8000/api" : "/api";
 const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL as string | undefined;
 const SUPABASE_ANON_KEY = import.meta.env.VITE_SUPABASE_ANON_KEY as string | undefined;
+const ADMIN_PIN = import.meta.env.VITE_ADMIN_PIN as string | undefined;
 const USE_SUPABASE = Boolean(SUPABASE_URL && SUPABASE_ANON_KEY);
 const VOTERS = ["MISHA", "LEKU", "SEPIA", "ICHITBO"];
 const MINUTES = Array.from({ length: 12 }, (_, index) => String(index * 5).padStart(2, "0"));
@@ -131,6 +132,15 @@ function formatShortDate(date: string) {
   }).format(new Date(Date.UTC(year, month - 1, day, 12)));
 }
 
+function formatUpdatedAt(value: string) {
+  return `${new Intl.DateTimeFormat("es-AR", {
+    hour: "2-digit",
+    minute: "2-digit",
+    hour12: false,
+    timeZone: "America/Argentina/Buenos_Aires",
+  }).format(new Date(value))} hs`;
+}
+
 function todayBuenosAires() {
   return new Intl.DateTimeFormat("en-CA", {
     timeZone: "America/Argentina/Buenos_Aires",
@@ -157,52 +167,80 @@ function toOverlap(start: number, end: number, voters: string[]) {
   return { start: minutesToTime(start), end: minutesToTime(end), voters };
 }
 
-function calculateOverlaps(votes: Vote[]): Summary["overlaps"] {
-  const events = new Map<string, Set<string>>();
+function overlapDuration(overlap: Summary["overlaps"][number]) {
+  return timeToMinutes(overlap.end) - timeToMinutes(overlap.start);
+}
 
-  votes.forEach((vote) => {
-    if (!vote.canPlay) return;
-    vote.ranges.forEach((range) => {
-      for (let minute = timeToMinutes(range.start); minute < timeToMinutes(range.end); minute += 5) {
-        const key = `${minute}-${minute + 5}`;
-        const voters = events.get(key) ?? new Set<string>();
-        voters.add(vote.voter);
-        events.set(key, voters);
-      }
+function sortOverlaps(overlaps: Summary["overlaps"]) {
+  return [...overlaps].sort((a, b) => {
+    const playersDiff = b.voters.length - a.voters.length;
+    if (playersDiff) return playersDiff;
+
+    const durationDiff = overlapDuration(b) - overlapDuration(a);
+    if (durationDiff) return durationDiff;
+
+    return timeToMinutes(a.start) - timeToMinutes(b.start);
+  });
+}
+
+function combinations<T>(items: T[], size: number): T[][] {
+  if (size === 0) return [[]];
+  if (items.length < size) return [];
+
+  return items.flatMap((item, index) =>
+    combinations(items.slice(index + 1), size - 1).map((rest) => [item, ...rest]),
+  );
+}
+
+function intersectRanges(existing: Array<[number, number]>, ranges: Range[]) {
+  const next: Array<[number, number]> = [];
+  existing.forEach(([currentStart, currentEnd]) => {
+    ranges.forEach((range) => {
+      const start = Math.max(currentStart, timeToMinutes(range.start));
+      const end = Math.min(currentEnd, timeToMinutes(range.end));
+      if (end > start) next.push([start, end]);
     });
   });
+  return next;
+}
 
+function mergeIntervals(intervals: Array<[number, number]>) {
+  return intervals
+    .sort(([aStart, aEnd], [bStart, bEnd]) => aStart - bStart || aEnd - bEnd)
+    .reduce<Array<[number, number]>>((merged, [start, end]) => {
+      const last = merged.at(-1);
+      if (last && start <= last[1]) {
+        last[1] = Math.max(last[1], end);
+        return merged;
+      }
+      merged.push([start, end]);
+      return merged;
+    }, []);
+}
+
+function calculateOverlaps(votes: Vote[]): Summary["overlaps"] {
+  const playableVotes = votes.filter((vote) => vote.canPlay && vote.ranges.length);
   const overlaps: Summary["overlaps"] = [];
-  let activeVoters: string[] | null = null;
-  let activeStart: number | null = null;
-  let activeEnd: number | null = null;
 
-  Array.from(events.entries())
-    .map(([key, voters]) => {
-      const [start, end] = key.split("-").map(Number);
-      return { start, end, voters: Array.from(voters).sort() };
-    })
-    .sort((a, b) => a.start - b.start)
-    .forEach(({ start, end, voters }) => {
-      if (voters.length < 2) return;
-      const sameVoters = activeVoters?.join("|") === voters.join("|");
-      if (sameVoters && activeEnd === start) {
-        activeEnd = end;
-        return;
-      }
-      if (activeVoters && activeStart !== null && activeEnd !== null) {
-        overlaps.push(toOverlap(activeStart, activeEnd, activeVoters));
-      }
-      activeVoters = voters;
-      activeStart = start;
-      activeEnd = end;
+  for (let size = 2; size <= playableVotes.length; size += 1) {
+    combinations(playableVotes, size).forEach((group) => {
+      const [firstVote, ...otherVotes] = group;
+      const initialIntervals = firstVote.ranges.map((range) => [
+        timeToMinutes(range.start),
+        timeToMinutes(range.end),
+      ]) as Array<[number, number]>;
+      const commonIntervals = otherVotes.reduce(
+        (intervals, vote) => intersectRanges(intervals, vote.ranges),
+        initialIntervals,
+      );
+      const voters = group.map((vote) => vote.voter).sort();
+      mergeIntervals(commonIntervals).forEach(([start, end]) => {
+        overlaps.push(toOverlap(start, end, voters));
+      });
     });
-
-  if (activeVoters && activeStart !== null && activeEnd !== null) {
-    overlaps.push(toOverlap(activeStart, activeEnd, activeVoters));
   }
 
-  return overlaps;
+  return sortOverlaps(overlaps);
 }
 
 async function supabaseRequest<T>(path: string, options?: RequestInit): Promise<T> {
@@ -212,6 +250,7 @@ async function supabaseRequest<T>(path: string, options?: RequestInit): Promise<
 
   const response = await fetch(`${SUPABASE_URL}/rest/v1${path}`, {
     ...options,
+    cache: "no-store",
     headers: {
       apikey: SUPABASE_ANON_KEY,
       Authorization: `Bearer ${SUPABASE_ANON_KEY}`,
@@ -274,6 +313,28 @@ async function saveAppVote(voter: string, canPlay: boolean, ranges: Range[]): Pr
   return loadAppSummary();
 }
 
+async function deleteTodayVotes(pin: string): Promise<Summary> {
+  if (!ADMIN_PIN || pin !== ADMIN_PIN) {
+    throw new Error("PIN incorrecto.");
+  }
+
+  if (!USE_SUPABASE) {
+    return request<Summary>("/votes/today", {
+      method: "DELETE",
+      body: JSON.stringify({ pin }),
+    });
+  }
+
+  const date = todayBuenosAires();
+  await supabaseRequest<undefined>(`/votes?date=eq.${date}`, {
+    method: "DELETE",
+    headers: {
+      Prefer: "return=minimal",
+    },
+  });
+  return loadAppSummary();
+}
+
 async function request<T>(path: string, options?: RequestInit): Promise<T> {
   let response: Response;
 
@@ -309,10 +370,29 @@ function App() {
   const [dialModes, setDialModes] = useState<DialModes>({});
   const [activeRangeFields, setActiveRangeFields] = useState<ActiveRangeFields>({});
   const [collapsedRanges, setCollapsedRanges] = useState<CollapsedRanges>({});
+  const [adminOpen, setAdminOpen] = useState(false);
+  const [adminPin, setAdminPin] = useState("");
+  const [adminUnlocked, setAdminUnlocked] = useState(false);
+  const [adminDeleting, setAdminDeleting] = useState(false);
+  const [adminError, setAdminError] = useState("");
+  const [overlapFilters, setOverlapFilters] = useState<string[]>([]);
 
   const currentVote = useMemo(
     () => summary?.votes.find((vote) => vote.voter.toLowerCase() === voterName.toLowerCase()),
     [summary, voterName],
+  );
+  const filteredOverlaps = useMemo(() => {
+    const overlaps = summary?.overlaps ?? [];
+    if (overlapFilters.length < 2) return overlaps;
+    return overlaps.filter(
+      (overlap) =>
+        overlap.voters.length === overlapFilters.length &&
+        overlapFilters.every((voter) => overlap.voters.includes(voter)),
+    );
+  }, [overlapFilters, summary?.overlaps]);
+  const sortedVotes = useMemo(
+    () => [...(summary?.votes ?? [])].sort((a, b) => Date.parse(b.updatedAt) - Date.parse(a.updatedAt)),
+    [summary?.votes],
   );
 
   async function loadSummary() {
@@ -373,6 +453,23 @@ function App() {
 
   function cancelVoterConfirmation() {
     setPendingVoterName("");
+  }
+
+  function toggleOverlapFilter(name: string) {
+    setOverlapFilters((items) =>
+      items.includes(name) ? items.filter((item) => item !== name) : [...items, name],
+    );
+  }
+
+  function resetVotingFlow() {
+    setVoterName("");
+    setPendingVoterName("");
+    setCanPlay(null);
+    setRanges([DEFAULT_RANGE]);
+    setSavedRanges([]);
+    setCollapsedRanges({});
+    setDialModes({});
+    setActiveRangeFields({});
   }
 
   function updateRange(index: number, field: keyof Range, value: string) {
@@ -469,14 +566,44 @@ function App() {
       }
       const savedSummary = await saveAppVote(voterName, canPlay, usableRanges);
       setSummary(savedSummary);
-      setSavedRanges(usableRanges);
-      if (canPlay) {
-        setCollapsedRanges(Object.fromEntries(usableRanges.map((_, index) => [index, true])));
-      }
+      resetVotingFlow();
     } catch (err) {
       setError(err instanceof Error ? err.message : "No se pudo guardar tu voto");
     } finally {
       setSaving(false);
+    }
+  }
+
+  function unlockAdmin() {
+    setAdminError("");
+    if (!ADMIN_PIN) {
+      setAdminError("Falta configurar el PIN admin.");
+      return;
+    }
+    if (adminPin !== ADMIN_PIN) {
+      setAdminError("PIN incorrecto.");
+      return;
+    }
+    setAdminUnlocked(true);
+  }
+
+  async function deleteDayVotes() {
+    const confirmed = window.confirm("Seguro que queres borrar todos los votos de hoy?");
+    if (!confirmed) return;
+
+    setAdminDeleting(true);
+    setAdminError("");
+    try {
+      const cleanSummary = await deleteTodayVotes(adminPin);
+      setSummary(cleanSummary);
+      resetVotingFlow();
+      setAdminOpen(false);
+      setAdminUnlocked(false);
+      setAdminPin("");
+    } catch (err) {
+      setAdminError(err instanceof Error ? err.message : "No se pudieron borrar los votos del dia.");
+    } finally {
+      setAdminDeleting(false);
     }
   }
 
@@ -500,6 +627,36 @@ function App() {
                 Buenos Aires
               </span>
             </div>
+          </div>
+          <div className="admin-wrap">
+            <button className="secondary-button admin-toggle" onClick={() => setAdminOpen((value) => !value)}>
+              ADMIN
+            </button>
+            {adminOpen ? (
+              <div className="admin-panel">
+                {!adminUnlocked ? (
+                  <>
+                    <label htmlFor="admin-pin">PIN</label>
+                    <input
+                      id="admin-pin"
+                      inputMode="numeric"
+                      type="password"
+                      value={adminPin}
+                      onChange={(event) => setAdminPin(event.target.value)}
+                    />
+                    <button className="secondary-button" onClick={unlockAdmin}>
+                      ENTRAR
+                    </button>
+                  </>
+                ) : (
+                  <button className="danger-admin-button" onClick={deleteDayVotes} disabled={adminDeleting}>
+                    {adminDeleting ? <Loader2 className="animate-spin" size={16} /> : <Trash2 size={16} />}
+                    BORRAR VOTOS DE HOY
+                  </button>
+                )}
+                {adminError ? <p>{adminError}</p> : null}
+              </div>
+            ) : null}
           </div>
         </div>
       </header>
@@ -612,8 +769,8 @@ function App() {
               <span>{summary?.votes.length ?? 0} confirmaron</span>
             </div>
             <div className="mt-4 grid gap-3">
-              {summary?.votes.length ? (
-                summary.votes.map((vote) => <VoteCard key={vote.voter} vote={vote} />)
+              {sortedVotes.length ? (
+                sortedVotes.map((vote) => <VoteCard key={vote.voter} vote={vote} />)
               ) : (
                 <p className="empty-state">Todavia no hay votos cargados para hoy.</p>
               )}
@@ -621,10 +778,31 @@ function App() {
           </div>
 
           <div className="panel">
-            <h2 className="panel-title">COINCIDENCIAS</h2>
-            <div className="mt-4 grid gap-3">
-              {summary?.overlaps.length ? (
-                summary.overlaps.map((overlap) => (
+            <div className="section-heading">
+              <h2 className="panel-title">COINCIDENCIAS</h2>
+              <span>{filteredOverlaps.length} matches</span>
+            </div>
+            <div className="overlap-filter" aria-label="Filtrar coincidencias por jugador">
+              <span>Filtrar por:</span>
+              <button
+                className={overlapFilters.length < 2 ? "active" : ""}
+                onClick={() => setOverlapFilters([])}
+              >
+                TODOS
+              </button>
+              {VOTERS.map((name) => (
+                <button
+                  className={overlapFilters.includes(name) ? "active" : ""}
+                  key={name}
+                  onClick={() => toggleOverlapFilter(name)}
+                >
+                  {name}
+                </button>
+              ))}
+            </div>
+            <div className="overlap-list mt-4 grid gap-3">
+              {filteredOverlaps.length ? (
+                filteredOverlaps.map((overlap) => (
                   <div className="overlap-row" key={`${overlap.start}-${overlap.end}-${overlap.voters.join("-")}`}>
                     <strong>
                       {overlap.start} hs a {overlap.end} hs
@@ -632,6 +810,8 @@ function App() {
                     <span>{overlap.voters.join(", ")}</span>
                   </div>
                 ))
+              ) : summary?.overlaps.length ? (
+                <p className="empty-state">No hay coincidencias con ese filtro.</p>
               ) : (
                 <p className="empty-state">Cuando haya horarios compatibles entre dos o mas personas, apareceran aca.</p>
               )}
@@ -897,7 +1077,7 @@ function VoteCard({ vote }: { vote: Vote }) {
     <article className="vote-card">
       <div className="vote-card-header">
         <h3>{vote.voter}</h3>
-        <p>Actualizado {new Intl.DateTimeFormat("es-AR", { timeStyle: "short", dateStyle: "short" }).format(new Date(vote.updatedAt))}</p>
+        <p>Actualizado {formatUpdatedAt(vote.updatedAt)}</p>
       </div>
       {vote.canPlay ? (
         <div className="range-list">
