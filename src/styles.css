@@ -211,8 +211,8 @@ button {
   background: rgba(56, 200, 204, 0.12);
 }
 
-.admin-wrap {
-  @apply relative self-start sm:self-auto;
+.admin-strip {
+  @apply flex flex-col items-end gap-2;
 }
 
 .admin-toggle {
@@ -220,10 +220,10 @@ button {
 }
 
 .admin-panel {
-  @apply absolute right-0 top-12 z-40 grid w-64 gap-3 rounded-lg border p-4 text-sm;
-  background: rgba(37, 36, 64, 0.96);
+  @apply grid w-full gap-3 rounded-lg border p-4 text-sm sm:w-80;
+  background: rgba(52, 50, 85, 0.82);
   border-color: rgba(164, 236, 212, 0.18);
-  box-shadow: 0 22px 46px rgba(17, 16, 31, 0.42);
+  box-shadow: 0 18px 42px rgba(17, 16, 31, 0.24);
 }
 
 .admin-panel label {
@@ -243,9 +243,22 @@ button {
   border-color: rgba(56, 200, 204, 0.72);
 }
 
-.admin-panel p {
+.admin-error {
   @apply text-xs;
   color: #ffd2d2;
+}
+
+.admin-confirm {
+  @apply grid gap-3;
+}
+
+.admin-confirm p {
+  @apply text-sm;
+  color: rgba(247, 255, 252, 0.78);
+}
+
+.admin-confirm div {
+  @apply grid gap-2 sm:grid-cols-2;
 }
 
 .danger-admin-button {

@@ -318,6 +318,8 @@ async function deleteTodayVotes(pin: string): Promise<Summary> {
     throw new Error("PIN incorrecto.");
   }
 
+  const beforeDelete = await loadAppSummary();
+
   if (!USE_SUPABASE) {
     return request<Summary>("/votes/today", {
       method: "DELETE",
@@ -332,7 +334,11 @@ async function deleteTodayVotes(pin: string): Promise<Summary> {
       Prefer: "return=minimal",
     },
   });
-  return loadAppSummary();
+  const afterDelete = await loadAppSummary();
+  if (beforeDelete.votes.length > 0 && afterDelete.votes.length > 0) {
+    throw new Error("Supabase no borro los votos. Revisa que exista la policy DELETE en la tabla votes.");
+  }
+  return afterDelete;
 }
 
 async function request<T>(path: string, options?: RequestInit): Promise<T> {
@@ -375,6 +381,7 @@ function App() {
   const [adminUnlocked, setAdminUnlocked] = useState(false);
   const [adminDeleting, setAdminDeleting] = useState(false);
   const [adminError, setAdminError] = useState("");
+  const [adminConfirming, setAdminConfirming] = useState(false);
   const [overlapFilters, setOverlapFilters] = useState<string[]>([]);
 
   const currentVote = useMemo(
@@ -588,9 +595,6 @@ function App() {
   }
 
   async function deleteDayVotes() {
-    const confirmed = window.confirm("Seguro que queres borrar todos los votos de hoy?");
-    if (!confirmed) return;
-
     setAdminDeleting(true);
     setAdminError("");
     try {
@@ -599,6 +603,7 @@ function App() {
       resetVotingFlow();
       setAdminOpen(false);
       setAdminUnlocked(false);
+      setAdminConfirming(false);
       setAdminPin("");
     } catch (err) {
       setAdminError(err instanceof Error ? err.message : "No se pudieron borrar los votos del dia.");
@@ -627,36 +632,6 @@ function App() {
                 Buenos Aires
               </span>
             </div>
-          </div>
-          <div className="admin-wrap">
-            <button className="secondary-button admin-toggle" onClick={() => setAdminOpen((value) => !value)}>
-              ADMIN
-            </button>
-            {adminOpen ? (
-              <div className="admin-panel">
-                {!adminUnlocked ? (
-                  <>
-                    <label htmlFor="admin-pin">PIN</label>
-                    <input
-                      id="admin-pin"
-                      inputMode="numeric"
-                      type="password"
-                      value={adminPin}
-                      onChange={(event) => setAdminPin(event.target.value)}
-                    />
-                    <button className="secondary-button" onClick={unlockAdmin}>
-                      ENTRAR
-                    </button>
-                  </>
-                ) : (
-                  <button className="danger-admin-button" onClick={deleteDayVotes} disabled={adminDeleting}>
-                    {adminDeleting ? <Loader2 className="animate-spin" size={16} /> : <Trash2 size={16} />}
-                    BORRAR VOTOS DE HOY
-                  </button>
-                )}
-                {adminError ? <p>{adminError}</p> : null}
-              </div>
-            ) : null}
           </div>
         </div>
       </header>
@@ -763,6 +738,50 @@ function App() {
         </section>
 
         <section className="space-y-6">
+          <div className="admin-strip">
+            <button className="secondary-button admin-toggle" onClick={() => setAdminOpen((value) => !value)}>
+              ADMIN
+            </button>
+            {adminOpen ? (
+              <div className="admin-panel">
+                {!adminUnlocked ? (
+                  <>
+                    <label htmlFor="admin-pin">PIN</label>
+                    <input
+                      id="admin-pin"
+                      inputMode="numeric"
+                      type="password"
+                      value={adminPin}
+                      onChange={(event) => setAdminPin(event.target.value)}
+                    />
+                    <button className="secondary-button" onClick={unlockAdmin}>
+                      ENTRAR
+                    </button>
+                  </>
+                ) : adminConfirming ? (
+                  <div className="admin-confirm">
+                    <p>Seguro que queres borrar todos los votos de hoy?</p>
+                    <div>
+                      <button className="danger-admin-button" onClick={deleteDayVotes} disabled={adminDeleting}>
+                        {adminDeleting ? <Loader2 className="animate-spin" size={16} /> : <Trash2 size={16} />}
+                        SI, BORRAR
+                      </button>
+                      <button className="secondary-button" onClick={() => setAdminConfirming(false)}>
+                        CANCELAR
+                      </button>
+                    </div>
+                  </div>
+                ) : (
+                  <button className="danger-admin-button" onClick={() => setAdminConfirming(true)} disabled={adminDeleting}>
+                    <Trash2 size={16} />
+                    BORRAR VOTOS DE HOY
+                  </button>
+                )}
+                {adminError ? <p className="admin-error">{adminError}</p> : null}
+              </div>
+            ) : null}
+          </div>
+
           <div className="panel">
             <div className="section-heading">
               <h2 className="panel-title">RESULTADOS DEL DIA</h2>
