@@ -4,6 +4,7 @@ create table if not exists public.votes (
   voter text not null,
   can_play boolean not null,
   ranges jsonb not null default '[]'::jsonb,
+  comment text not null default '',
   updated_at timestamptz not null,
   primary key (date, voter_key),
   constraint votes_known_voter check (voter_key in ('misha', 'leku', 'sepia', 'ichitbo')),
@@ -11,6 +12,9 @@ create table if not exists public.votes (
 );
 
 create index if not exists votes_date_idx on public.votes (date);
+
+alter table public.votes
+add column if not exists comment text not null default '';
 
 alter table public.votes enable row level security;
 

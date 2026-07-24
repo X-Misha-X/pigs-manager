@@ -28,6 +28,7 @@ type Vote = {
   voter: string;
   canPlay: boolean;
   ranges: Range[];
+  comment: string;
   updatedAt: string;
 };
 
@@ -48,6 +49,7 @@ type SupabaseVoteRow = {
   voter: string;
   can_play: boolean;
   ranges: Range[];
+  comment?: string | null;
   updated_at: string;
 };
 
@@ -159,6 +161,7 @@ function voteFromSupabaseRow(row: SupabaseVoteRow): Vote {
     voter: row.voter,
     canPlay: row.can_play,
     ranges: row.ranges,
+    comment: row.comment ?? "",
     updatedAt: row.updated_at,
   };
 }
@@ -286,11 +289,11 @@ async function loadAppSummary(): Promise<Summary> {
   };
 }
 
-async function saveAppVote(voter: string, canPlay: boolean, ranges: Range[]): Promise<Summary> {
+async function saveAppVote(voter: string, canPlay: boolean, ranges: Range[], comment: string): Promise<Summary> {
   if (!USE_SUPABASE) {
     return request<Summary>("/votes", {
       method: "POST",
-      body: JSON.stringify({ voter, canPlay, ranges }),
+      body: JSON.stringify({ voter, canPlay, ranges, comment }),
     });
   }
 
@@ -303,6 +306,7 @@ async function saveAppVote(voter: string, canPlay: boolean, ranges: Range[]): Pr
       voter,
       can_play: canPlay,
       ranges,
+      comment,
       updated_at: nowBuenosAires(),
     }),
     headers: {
@@ -369,6 +373,7 @@ function App() {
   const [pendingVoterName, setPendingVoterName] = useState("");
   const [canPlay, setCanPlay] = useState<boolean | null>(null);
   const [ranges, setRanges] = useState<Range[]>([DEFAULT_RANGE]);
+  const [comment, setComment] = useState("");
   const [savedRanges, setSavedRanges] = useState<Range[]>([]);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -422,6 +427,7 @@ function App() {
     if (!voterName) {
       setCanPlay(null);
       setRanges([DEFAULT_RANGE]);
+      setComment("");
       setSavedRanges([]);
       return;
     }
@@ -430,6 +436,7 @@ function App() {
       setCanPlay(currentVote.canPlay);
       const loadedRanges = currentVote.ranges.length ? currentVote.ranges : [DEFAULT_RANGE];
       setRanges(loadedRanges);
+      setComment(currentVote.comment);
       setSavedRanges(currentVote.ranges);
       setCollapsedRanges(
         currentVote.canPlay
@@ -441,6 +448,7 @@ function App() {
 
     setCanPlay(null);
     setRanges([DEFAULT_RANGE]);
+    setComment("");
     setSavedRanges([]);
     setCollapsedRanges({});
   }, [currentVote, voterName]);
@@ -474,6 +482,7 @@ function App() {
     setPendingVoterName("");
     setCanPlay(null);
     setRanges([DEFAULT_RANGE]);
+    setComment("");
     setSavedRanges([]);
     setCollapsedRanges({});
     setDialModes({});
@@ -572,7 +581,7 @@ function App() {
         setError("La hora final no puede ser inferior a la de inicio.");
         return;
       }
-      const savedSummary = await saveAppVote(voterName, canPlay, usableRanges);
+      const savedSummary = await saveAppVote(voterName, canPlay, usableRanges, comment.trim());
       setSummary(savedSummary);
       resetVotingFlow();
     } catch (err) {
@@ -744,10 +753,21 @@ function App() {
             {error ? <p className="error-text">{error}</p> : null}
 
             {voterName && canPlay !== null ? (
-              <button className="primary-button w-full" onClick={saveVote} disabled={saving || !canSave}>
-                {saving ? <Loader2 className="animate-spin" size={18} /> : <Save size={18} />}
-                GUARDAR VOTO
-              </button>
+              <>
+                <label className="comment-field">
+                  <span>Comentarios:</span>
+                  <textarea
+                    maxLength={180}
+                    placeholder="Opcional"
+                    value={comment}
+                    onChange={(event) => setComment(event.target.value)}
+                  />
+                </label>
+                <button className="primary-button w-full" onClick={saveVote} disabled={saving || !canSave}>
+                  {saving ? <Loader2 className="animate-spin" size={18} /> : <Save size={18} />}
+                  GUARDAR VOTO
+                </button>
+              </>
             ) : null}
           </div>
         </section>
@@ -1154,6 +1174,7 @@ function VoteCard({ vote }: { vote: Vote }) {
       ) : (
         <span className="cannot-play">No puede jugar hoy</span>
       )}
+      {vote.comment ? <blockquote className="vote-comment">"{vote.comment}"</blockquote> : null}
     </article>
   );
 }

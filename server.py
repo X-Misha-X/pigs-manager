@@ -59,6 +59,13 @@ def validate_ranges(can_play: bool, ranges: list[dict[str, str]]) -> list[dict[s
     return validated
 
 
+def normalize_comment(value: Any) -> str:
+    comment = " ".join(str(value or "").strip().split())
+    if len(comment) > 180:
+        raise ValueError("El comentario no puede superar 180 caracteres.")
+    return comment
+
+
 def connect() -> sqlite3.Connection:
     connection = sqlite3.connect(DB_PATH)
     connection.row_factory = sqlite3.Row
@@ -75,18 +82,22 @@ def init_db() -> None:
                 voter TEXT NOT NULL,
                 can_play INTEGER NOT NULL,
                 ranges_json TEXT NOT NULL,
+                comment TEXT NOT NULL DEFAULT '',
                 updated_at TEXT NOT NULL,
                 PRIMARY KEY (date, voter_key)
             )
             """
         )
+        columns = [row["name"] for row in db.execute("PRAGMA table_info(votes)").fetchall()]
+        if "comment" not in columns:
+            db.execute("ALTER TABLE votes ADD COLUMN comment TEXT NOT NULL DEFAULT ''")
 
 
 def get_votes(date: str) -> list[dict[str, Any]]:
     with connect() as db:
         rows = db.execute(
             """
-            SELECT voter, can_play, ranges_json, updated_at
+            SELECT voter, can_play, ranges_json, comment, updated_at
             FROM votes
             WHERE date = ?
             ORDER BY lower(voter)
@@ -99,6 +110,7 @@ def get_votes(date: str) -> list[dict[str, Any]]:
             "voter": row["voter"],
             "canPlay": bool(row["can_play"]),
             "ranges": json.loads(row["ranges_json"]),
+            "comment": row["comment"],
             "updatedAt": row["updated_at"],
         }
         for row in rows
@@ -197,17 +209,19 @@ class SurveyHandler(BaseHTTPRequestHandler):
             voter = normalize_name(str(payload.get("voter", "")))
             can_play = bool(payload.get("canPlay", False))
             ranges = validate_ranges(can_play, payload.get("ranges", []))
+            comment = normalize_comment(payload.get("comment", ""))
             voter_key = voter.lower()
 
             with connect() as db:
                 db.execute(
                     """
-                    INSERT INTO votes (date, voter_key, voter, can_play, ranges_json, updated_at)
-                    VALUES (?, ?, ?, ?, ?, ?)
+                    INSERT INTO votes (date, voter_key, voter, can_play, ranges_json, comment, updated_at)
+                    VALUES (?, ?, ?, ?, ?, ?, ?)
                     ON CONFLICT(date, voter_key) DO UPDATE SET
                         voter = excluded.voter,
                         can_play = excluded.can_play,
                         ranges_json = excluded.ranges_json,
+                        comment = excluded.comment,
                         updated_at = excluded.updated_at
                     """,
                     (
@@ -216,6 +230,7 @@ class SurveyHandler(BaseHTTPRequestHandler):
                         voter,
                         int(can_play),
                         json.dumps(ranges),
+                        comment,
                         now_buenos_aires(),
                     ),
                 )
