@@ -447,6 +447,7 @@ function App() {
 
   function requestVoterConfirmation(name: string) {
     if (voterName === name) return;
+    resetVotingFlow();
     setPendingVoterName(name);
     setError("");
   }
@@ -633,6 +634,20 @@ function App() {
               </span>
             </div>
           </div>
+          <AdminControls
+            adminDeleting={adminDeleting}
+            adminError={adminError}
+            adminOpen={adminOpen}
+            adminPin={adminPin}
+            adminUnlocked={adminUnlocked}
+            adminConfirming={adminConfirming}
+            onCancelConfirm={() => setAdminConfirming(false)}
+            onDelete={deleteDayVotes}
+            onPinChange={setAdminPin}
+            onRequestDelete={() => setAdminConfirming(true)}
+            onToggle={() => setAdminOpen((value) => !value)}
+            onUnlock={unlockAdmin}
+          />
         </div>
       </header>
 
@@ -738,50 +753,6 @@ function App() {
         </section>
 
         <section className="space-y-6">
-          <div className="admin-strip">
-            <button className="secondary-button admin-toggle" onClick={() => setAdminOpen((value) => !value)}>
-              ADMIN
-            </button>
-            {adminOpen ? (
-              <div className="admin-panel">
-                {!adminUnlocked ? (
-                  <>
-                    <label htmlFor="admin-pin">PIN</label>
-                    <input
-                      id="admin-pin"
-                      inputMode="numeric"
-                      type="password"
-                      value={adminPin}
-                      onChange={(event) => setAdminPin(event.target.value)}
-                    />
-                    <button className="secondary-button" onClick={unlockAdmin}>
-                      ENTRAR
-                    </button>
-                  </>
-                ) : adminConfirming ? (
-                  <div className="admin-confirm">
-                    <p>Seguro que queres borrar todos los votos de hoy?</p>
-                    <div>
-                      <button className="danger-admin-button" onClick={deleteDayVotes} disabled={adminDeleting}>
-                        {adminDeleting ? <Loader2 className="animate-spin" size={16} /> : <Trash2 size={16} />}
-                        SI, BORRAR
-                      </button>
-                      <button className="secondary-button" onClick={() => setAdminConfirming(false)}>
-                        CANCELAR
-                      </button>
-                    </div>
-                  </div>
-                ) : (
-                  <button className="danger-admin-button" onClick={() => setAdminConfirming(true)} disabled={adminDeleting}>
-                    <Trash2 size={16} />
-                    BORRAR VOTOS DE HOY
-                  </button>
-                )}
-                {adminError ? <p className="admin-error">{adminError}</p> : null}
-              </div>
-            ) : null}
-          </div>
-
           <div className="panel">
             <div className="section-heading">
               <h2 className="panel-title">RESULTADOS DEL DIA</h2>
@@ -839,6 +810,80 @@ function App() {
         </section>
       </div>
     </main>
+  );
+}
+
+function AdminControls({
+  adminDeleting,
+  adminError,
+  adminOpen,
+  adminPin,
+  adminUnlocked,
+  adminConfirming,
+  onCancelConfirm,
+  onDelete,
+  onPinChange,
+  onRequestDelete,
+  onToggle,
+  onUnlock,
+}: {
+  adminDeleting: boolean;
+  adminError: string;
+  adminOpen: boolean;
+  adminPin: string;
+  adminUnlocked: boolean;
+  adminConfirming: boolean;
+  onCancelConfirm: () => void;
+  onDelete: () => void;
+  onPinChange: (value: string) => void;
+  onRequestDelete: () => void;
+  onToggle: () => void;
+  onUnlock: () => void;
+}) {
+  return (
+    <div className="admin-strip">
+      <button className="secondary-button admin-toggle" onClick={onToggle}>
+        ADMIN
+      </button>
+      {adminOpen ? (
+        <div className="admin-panel">
+          {!adminUnlocked ? (
+            <>
+              <label htmlFor="admin-pin">PIN</label>
+              <input
+                id="admin-pin"
+                inputMode="numeric"
+                type="password"
+                value={adminPin}
+                onChange={(event) => onPinChange(event.target.value)}
+              />
+              <button className="secondary-button" onClick={onUnlock}>
+                ENTRAR
+              </button>
+            </>
+          ) : adminConfirming ? (
+            <div className="admin-confirm">
+              <p>Seguro que queres borrar todos los votos de hoy?</p>
+              <div>
+                <button className="danger-admin-button" onClick={onDelete} disabled={adminDeleting}>
+                  {adminDeleting ? <Loader2 className="animate-spin" size={16} /> : <Trash2 size={16} />}
+                  SI, BORRAR
+                </button>
+                <button className="secondary-button" onClick={onCancelConfirm}>
+                  CANCELAR
+                </button>
+              </div>
+            </div>
+          ) : (
+            <button className="danger-admin-button" onClick={onRequestDelete} disabled={adminDeleting}>
+              <Trash2 size={16} />
+              BORRAR VOTOS DE HOY
+            </button>
+          )}
+          {adminError ? <p className="admin-error">{adminError}</p> : null}
+        </div>
+      ) : null}
+    </div>
   );
 }
 
