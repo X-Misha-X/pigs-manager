@@ -676,6 +676,28 @@ button {
   color: #ffd2d2;
 }
 
+.comment-field {
+  @apply grid gap-2;
+}
+
+.comment-field span {
+  @apply text-xs font-semibold uppercase;
+  color: rgba(247, 255, 252, 0.58);
+  letter-spacing: 0.1em;
+}
+
+.comment-field textarea {
+  @apply min-h-24 resize-y rounded-md border px-3 py-3 text-sm outline-none;
+  background: rgba(18, 18, 33, 0.48);
+  border-color: rgba(164, 236, 212, 0.14);
+  color: white;
+}
+
+.comment-field textarea:focus {
+  border-color: rgba(56, 200, 204, 0.72);
+  box-shadow: 0 0 0 1px rgba(56, 200, 204, 0.18);
+}
+
 .error-text {
   @apply rounded-md border px-3 py-2 text-sm font-medium;
   border-color: rgba(234, 116, 116, 0.34);
@@ -725,6 +747,13 @@ button {
   @apply inline-flex w-fit rounded-md px-3 py-2 text-sm font-semibold;
   background: rgba(234, 116, 116, 0.14);
   color: #ffd2d2;
+}
+
+.vote-comment {
+  @apply rounded-md border px-3 py-2 text-sm;
+  border-color: rgba(164, 236, 212, 0.12);
+  background: rgba(18, 18, 33, 0.24);
+  color: rgba(247, 255, 252, 0.72);
 }
 
 .overlap-filter {
