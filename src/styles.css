@@ -64,8 +64,44 @@ button {
   color: #f7fffc;
 }
 
+.app-layout {
+  @apply mx-auto max-w-6xl px-4 pb-8 pt-4;
+}
+
+.app-main {
+  @apply min-w-0;
+}
+
+.voter-panel-global {
+  @apply mb-5;
+}
+
+.sidebar-title {
+  @apply text-sm;
+}
+
+.section-switch {
+  @apply mb-5 grid grid-cols-2 rounded-lg border p-1;
+  background: rgba(37, 36, 64, 0.72);
+  border-color: rgba(164, 236, 212, 0.14);
+  box-shadow: 0 18px 44px rgba(17, 16, 31, 0.16);
+}
+
+.section-switch button {
+  @apply rounded-md px-3 py-3 text-center text-xs font-semibold uppercase sm:text-sm;
+  color: rgba(247, 255, 252, 0.62);
+}
+
+.section-switch button.active {
+  color: var(--mint);
+  background: rgba(56, 200, 204, 0.16);
+  box-shadow:
+    0 0 0 1px rgba(56, 200, 204, 0.42) inset,
+    0 0 16px rgba(56, 200, 204, 0.12);
+}
+
 .topbar-inner {
-  @apply mx-auto flex max-w-6xl flex-col gap-4 px-4 pb-7 pt-6 sm:flex-row sm:items-start sm:justify-between;
+  @apply flex flex-col gap-4 pb-7 pt-2 sm:flex-row sm:items-start sm:justify-between;
 }
 
 .topbar h1 {
@@ -113,7 +149,7 @@ button {
 }
 
 .content-grid {
-  @apply mx-auto grid max-w-6xl gap-5 px-4 pb-8 lg:grid-cols-[minmax(400px,420px)_minmax(0,1fr)];
+  @apply grid gap-5 lg:grid-cols-[minmax(390px,420px)_minmax(0,1fr)];
 }
 
 .panel {
@@ -144,6 +180,134 @@ button {
 .step-block {
   @apply border-t pt-5;
   border-color: rgba(164, 236, 212, 0.12);
+}
+
+.first-step {
+  @apply border-t-0 pt-0;
+}
+
+.section-placeholder {
+  min-height: 18rem;
+}
+
+.game-panel {
+  @apply grid gap-4;
+}
+
+.game-add-row {
+  @apply grid gap-3 sm:grid-cols-[minmax(0,1fr)_auto];
+}
+
+.game-add-row input {
+  @apply h-11 rounded-md border px-3 outline-none;
+  background: rgba(18, 18, 33, 0.72);
+  border-color: rgba(164, 236, 212, 0.16);
+  color: white;
+}
+
+.game-add-row input:focus {
+  border-color: rgba(56, 200, 204, 0.72);
+  box-shadow: 0 0 0 1px rgba(56, 200, 204, 0.24);
+}
+
+.game-list {
+  @apply grid gap-3;
+  min-height: 14rem;
+  align-content: start;
+}
+
+.game-row {
+  @apply grid gap-3 rounded-lg border p-4 sm:grid-cols-[minmax(0,1fr)_auto_auto] sm:items-center;
+  background: rgba(255, 255, 255, 0.05);
+  border-color: rgba(164, 236, 212, 0.14);
+}
+
+.game-main {
+  @apply grid min-w-0 gap-2;
+}
+
+.game-row label {
+  @apply flex min-w-0 items-center gap-3 text-base font-semibold;
+  color: #ffffff;
+}
+
+.game-row input {
+  @apply h-5 w-5 shrink-0;
+  accent-color: #38c8cc;
+}
+
+.game-row label span {
+  @apply min-w-0 break-words;
+}
+
+.game-voters {
+  @apply flex flex-wrap gap-2 sm:justify-end;
+}
+
+.game-voters span {
+  @apply rounded-md px-2.5 py-1 text-xs font-semibold;
+  background: rgba(56, 200, 204, 0.16);
+  color: var(--mint);
+}
+
+.game-voters em {
+  @apply text-sm not-italic;
+  color: rgba(247, 255, 252, 0.52);
+}
+
+.game-actions {
+  @apply flex items-center gap-2 sm:justify-end;
+}
+
+.inline-modal {
+  @apply fixed inset-0 z-50 grid justify-items-center px-4 pt-[18vh];
+  align-items: start;
+  background: rgba(17, 16, 31, 0.62);
+}
+
+.inline-modal-panel {
+  @apply grid w-full max-w-md gap-4 rounded-lg border p-5;
+  background: rgba(52, 50, 85, 0.98);
+  border-color: rgba(164, 236, 212, 0.2);
+  box-shadow: 0 26px 80px rgba(17, 16, 31, 0.52);
+}
+
+.inline-modal-panel h3 {
+  @apply text-base font-semibold;
+  color: #ffffff;
+  letter-spacing: 0.08em;
+}
+
+.inline-modal-panel p {
+  @apply mt-1 text-sm;
+  color: rgba(247, 255, 252, 0.62);
+}
+
+.inline-modal-panel input {
+  @apply h-11 rounded-md border px-3 outline-none;
+  background: rgba(18, 18, 33, 0.72);
+  border-color: rgba(164, 236, 212, 0.18);
+  color: white;
+}
+
+.inline-modal-panel input:focus {
+  border-color: rgba(56, 200, 204, 0.72);
+}
+
+.inline-modal-actions {
+  @apply grid gap-2 sm:grid-cols-2;
+}
+
+.inline-modal-actions .danger-action {
+  border-color: rgba(234, 116, 116, 0.95);
+  background: #ea7474;
+  color: #23172a;
+  box-shadow: 0 14px 34px rgba(234, 116, 116, 0.24);
+}
+
+.inline-modal-actions .danger-action:hover {
+  border-color: rgba(255, 210, 210, 0.9);
+  background: #ff8a8a;
 }
 
 .section-heading {
@@ -274,7 +438,7 @@ button {
 }
 
 .voter-grid {
-  @apply grid grid-cols-2 gap-2;
+  @apply mx-auto grid max-w-3xl grid-cols-2 gap-2;
 }
 
 .voter-button {
@@ -319,7 +483,7 @@ button {
 }
 
 .voter-confirm {
-  @apply mt-3 rounded-md border p-3;
+  @apply mx-auto mt-3 w-full max-w-3xl rounded-md border p-3;
   border-color: rgba(164, 236, 212, 0.2);
   background: rgba(18, 18, 33, 0.34);
 }
@@ -330,11 +494,11 @@ button {
 }
 
 .voter-confirm div {
-  @apply mt-3 grid grid-cols-2 gap-2;
+  @apply mt-3 flex flex-wrap justify-center gap-2;
 }
 
 .voter-confirm button {
-  @apply h-10 rounded-md border px-3 text-xs font-semibold transition;
+  @apply h-10 min-w-40 rounded-md border px-5 text-xs font-semibold transition;
   border-color: rgba(164, 236, 212, 0.16);
   background: rgba(255, 255, 255, 0.06);
   color: rgba(247, 255, 252, 0.72);
@@ -737,10 +901,37 @@ button {
   @apply flex flex-wrap gap-2;
 }
 
-.range-list span {
-  @apply rounded-md px-3 py-2 text-sm font-semibold;
+.range-chip {
+  @apply inline-flex items-center gap-2 rounded-md px-3 py-2 text-sm font-semibold;
   background: rgba(56, 200, 204, 0.14);
   color: var(--mint);
+}
+
+.range-chip strong {
+  @apply font-semibold;
+}
+
+.range-chip button {
+  @apply inline-flex h-6 w-6 items-center justify-center rounded border;
+  border-color: rgba(164, 236, 212, 0.22);
+  background: rgba(255, 255, 255, 0.07);
+  color: var(--mint);
+}
+
+.range-chip button:hover {
+  border-color: rgba(56, 200, 204, 0.72);
+  background: rgba(56, 200, 204, 0.14);
+}
+
+.range-chip button.danger {
+  border-color: rgba(234, 116, 116, 0.28);
+  background: rgba(234, 116, 116, 0.12);
+  color: #ffd2d2;
+}
+
+.range-chip button.danger:hover {
+  border-color: rgba(234, 116, 116, 0.72);
+  background: rgba(234, 116, 116, 0.2);
 }
 
 .cannot-play {

@@ -3,7 +3,6 @@ import { createRoot } from "react-dom/client";
 import {
   CalendarDays,
   Check,
-  Clock3,
   Loader2,
   Pencil,
   Plus,
@@ -23,6 +22,7 @@ type Range = {
 type DialModes = Record<string, "hour" | "minute">;
 type ActiveRangeFields = Record<string, keyof Range>;
 type CollapsedRanges = Record<number, boolean>;
+type AppSection = "today" | "game";
 
 type Vote = {
   voter: string;
@@ -30,6 +30,12 @@ type Vote = {
   ranges: Range[];
   comment: string;
   updatedAt: string;
+};
+
+type GameOption = {
+  id: string;
+  name: string;
+  voters: string[];
 };
 
 type Summary = {
@@ -53,12 +59,27 @@ type SupabaseVoteRow = {
   updated_at: string;
 };
 
+type SupabaseGameVoteRow = {
+  voter_key: string;
+  voter: string;
+};
+
+type SupabaseGameRow = {
+  id: string;
+  name: string;
+  created_by?: string | null;
+  created_at?: string;
+  updated_at?: string;
+  game_votes?: SupabaseGameVoteRow[];
+};
+
 const API_BASE = import.meta.env.DEV ? "http://127.0.0.1:8000/api" : "/api";
 const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL as string | undefined;
 const SUPABASE_ANON_KEY = import.meta.env.VITE_SUPABASE_ANON_KEY as string | undefined;
 const ADMIN_PIN = import.meta.env.VITE_ADMIN_PIN as string | undefined;
 const USE_SUPABASE = Boolean(SUPABASE_URL && SUPABASE_ANON_KEY);
 const VOTERS = ["MISHA", "LEKU", "SEPIA", "ICHITBO"];
+const GAMES_STORAGE_KEY = "chupapig-manager-games";
 const MINUTES = Array.from({ length: 12 }, (_, index) => String(index * 5).padStart(2, "0"));
 const HOURS = Array.from({ length: 24 }, (_, index) => String(index).padStart(2, "0"));
 const END_HOURS = [...HOURS, "24"];
@@ -143,6 +164,42 @@ function formatUpdatedAt(value: string) {
   }).format(new Date(value))} hs`;
 }
 
+function createGameId() {
+  if (typeof crypto !== "undefined" && "randomUUID" in crypto) {
+    return crypto.randomUUID();
+  }
+  return `${Date.now()}-${Math.random().toString(16).slice(2)}`;
+}
+
+function readStoredGames(): GameOption[] {
+  try {
+    const rawGames = localStorage.getItem(GAMES_STORAGE_KEY);
+    if (!rawGames) {
+      return [];
+    }
+    const parsedGames = JSON.parse(rawGames);
+    if (!Array.isArray(parsedGames)) {
+      return [];
+    }
+    return parsedGames
+      .filter((game): game is GameOption => {
+        return (
+          game &&
+          typeof game.id === "string" &&
+          typeof game.name === "string" &&
+          Array.isArray(game.voters)
+        );
+      })
+      .map((game) => ({
+        id: game.id,
+        name: game.name,
+        voters: game.voters.filter((voter) => VOTERS.includes(voter)),
+      }));
+  } catch {
+    return [];
+  }
+}
+
 function todayBuenosAires() {
   return new Intl.DateTimeFormat("en-CA", {
     timeZone: "America/Argentina/Buenos_Aires",
@@ -163,6 +220,16 @@ function voteFromSupabaseRow(row: SupabaseVoteRow): Vote {
     ranges: row.ranges,
     comment: row.comment ?? "",
     updatedAt: row.updated_at,
+  };
+}
+
+function gameFromSupabaseRow(row: SupabaseGameRow): GameOption {
+  return {
+    id: row.id,
+    name: row.name,
+    voters: (row.game_votes ?? [])
+      .map((vote) => vote.voter)
+      .filter((voter) => VOTERS.includes(voter)),
   };
 }
 
@@ -317,6 +384,96 @@ async function saveAppVote(voter: string, canPlay: boolean, ranges: Range[], com
   return loadAppSummary();
 }
 
+async function loadAppGames(): Promise<GameOption[]> {
+  if (!USE_SUPABASE) {
+    return readStoredGames();
+  }
+
+  const rows = await supabaseRequest<SupabaseGameRow[]>(
+    "/games?select=id,name,created_by,created_at,updated_at,game_votes(voter_key,voter)&order=updated_at.desc",
+  );
+  return rows.map(gameFromSupabaseRow);
+}
+
+async function createAppGame(name: string, voter: string): Promise<GameOption[]> {
+  if (!USE_SUPABASE) {
+    const nextGames = [...readStoredGames(), { id: createGameId(), name, voters: [] }];
+    localStorage.setItem(GAMES_STORAGE_KEY, JSON.stringify(nextGames));
+    return nextGames;
+  }
+
+  await supabaseRequest<SupabaseGameRow[]>("/games", {
+    method: "POST",
+    body: JSON.stringify({
+      name,
+      created_by: voter ? voter.toLowerCase() : null,
+      updated_at: nowBuenosAires(),
+    }),
+  });
+  return loadAppGames();
+}
+
+async function updateAppGameName(gameId: string, name: string): Promise<GameOption[]> {
+  if (!USE_SUPABASE) {
+    const nextGames = readStoredGames().map((game) => (game.id === gameId ? { ...game, name } : game));
+    localStorage.setItem(GAMES_STORAGE_KEY, JSON.stringify(nextGames));
+    return nextGames;
+  }
+
+  await supabaseRequest<SupabaseGameRow[]>(`/games?id=eq.${gameId}`, {
+    method: "PATCH",
+    body: JSON.stringify({ name, updated_at: nowBuenosAires() }),
+  });
+  return loadAppGames();
+}
+
+async function deleteAppGame(gameId: string): Promise<GameOption[]> {
+  if (!USE_SUPABASE) {
+    const nextGames = readStoredGames().filter((game) => game.id !== gameId);
+    localStorage.setItem(GAMES_STORAGE_KEY, JSON.stringify(nextGames));
+    return nextGames;
+  }
+
+  await supabaseRequest<undefined>(`/games?id=eq.${gameId}`, {
+    method: "DELETE",
+    headers: { Prefer: "return=minimal" },
+  });
+  return loadAppGames();
+}
+
+async function toggleAppGameVote(game: GameOption, voter: string): Promise<GameOption[]> {
+  if (!USE_SUPABASE) {
+    const nextGames = readStoredGames().map((item) => {
+      if (item.id !== game.id) return item;
+      const hasVote = item.voters.includes(voter);
+      return {
+        ...item,
+        voters: hasVote ? item.voters.filter((name) => name !== voter) : [...item.voters, voter],
+      };
+    });
+    localStorage.setItem(GAMES_STORAGE_KEY, JSON.stringify(nextGames));
+    return nextGames;
+  }
+
+  const voterKey = voter.toLowerCase();
+  if (game.voters.includes(voter)) {
+    await supabaseRequest<undefined>(`/game_votes?game_id=eq.${game.id}&voter_key=eq.${voterKey}`, {
+      method: "DELETE",
+      headers: { Prefer: "return=minimal" },
+    });
+  } else {
+    await supabaseRequest<SupabaseGameVoteRow[]>("/game_votes", {
+      method: "POST",
+      body: JSON.stringify({
+        game_id: game.id,
+        voter_key: voterKey,
+        voter,
+      }),
+    });
+  }
+  return loadAppGames();
+}
+
 async function deleteTodayVotes(pin: string): Promise<Summary> {
   if (!ADMIN_PIN || pin !== ADMIN_PIN) {
     throw new Error("PIN incorrecto.");
@@ -368,6 +525,7 @@ async function request<T>(path: string, options?: RequestInit): Promise<T> {
 }
 
 function App() {
+  const [activeSection, setActiveSection] = useState<AppSection>("today");
   const [summary, setSummary] = useState<Summary | null>(null);
   const [voterName, setVoterName] = useState("");
   const [pendingVoterName, setPendingVoterName] = useState("");
@@ -388,6 +546,14 @@ function App() {
   const [adminError, setAdminError] = useState("");
   const [adminConfirming, setAdminConfirming] = useState(false);
   const [overlapFilters, setOverlapFilters] = useState<string[]>([]);
+  const [games, setGames] = useState<GameOption[]>(() => (USE_SUPABASE ? [] : readStoredGames()));
+  const [gamesLoading, setGamesLoading] = useState(true);
+  const [gameSaving, setGameSaving] = useState(false);
+  const [newGameName, setNewGameName] = useState("");
+  const [gameError, setGameError] = useState("");
+  const [editingGame, setEditingGame] = useState<GameOption | null>(null);
+  const [editingGameName, setEditingGameName] = useState("");
+  const [gameToDelete, setGameToDelete] = useState<GameOption | null>(null);
 
   const currentVote = useMemo(
     () => summary?.votes.find((vote) => vote.voter.toLowerCase() === voterName.toLowerCase()),
@@ -406,6 +572,16 @@ function App() {
     () => [...(summary?.votes ?? [])].sort((a, b) => Date.parse(b.updatedAt) - Date.parse(a.updatedAt)),
     [summary?.votes],
   );
+  const sortedGames = useMemo(
+    () =>
+      [...games].sort((firstGame, secondGame) => {
+        if (secondGame.voters.length !== firstGame.voters.length) {
+          return secondGame.voters.length - firstGame.voters.length;
+        }
+        return firstGame.name.localeCompare(secondGame.name);
+      }),
+    [games],
+  );
 
   async function loadSummary() {
     setLoading(true);
@@ -419,9 +595,28 @@ function App() {
     }
   }
 
+  async function loadGames() {
+    setGamesLoading(true);
+    setGameError("");
+    try {
+      setGames(await loadAppGames());
+    } catch (err) {
+      setGameError(err instanceof Error ? err.message : "No se pudieron cargar los juegos.");
+    } finally {
+      setGamesLoading(false);
+    }
+  }
+
   useEffect(() => {
     loadSummary();
+    loadGames();
   }, []);
+
+  useEffect(() => {
+    if (!USE_SUPABASE && !gamesLoading) {
+      localStorage.setItem(GAMES_STORAGE_KEY, JSON.stringify(games));
+    }
+  }, [games, gamesLoading]);
 
   useEffect(() => {
     if (!voterName) {
@@ -475,6 +670,91 @@ function App() {
     setOverlapFilters((items) =>
       items.includes(name) ? items.filter((item) => item !== name) : [...items, name],
     );
+  }
+
+  async function addGame() {
+    const trimmedName = newGameName.trim();
+    if (!trimmedName) {
+      setGameError("Escribe el nombre del juego antes de agregarlo.");
+      return;
+    }
+    if (games.some((game) => game.name.toLowerCase() === trimmedName.toLowerCase())) {
+      setGameError("Ese juego ya esta en la lista.");
+      return;
+    }
+    setGameSaving(true);
+    try {
+      setGames(await createAppGame(trimmedName, voterName));
+      setNewGameName("");
+      setGameError("");
+    } catch (err) {
+      setGameError(err instanceof Error ? err.message : "No se pudo agregar el juego.");
+    } finally {
+      setGameSaving(false);
+    }
+  }
+
+  async function toggleGameVote(game: GameOption) {
+    if (!voterName) {
+      setGameError("Selecciona quien vota antes de marcar un juego.");
+      return;
+    }
+    setGameSaving(true);
+    try {
+      setGames(await toggleAppGameVote(game, voterName));
+      setGameError("");
+    } catch (err) {
+      setGameError(err instanceof Error ? err.message : "No se pudo actualizar el voto del juego.");
+    } finally {
+      setGameSaving(false);
+    }
+  }
+
+  async function removeGame(gameId: string) {
+    setGameSaving(true);
+    try {
+      setGames(await deleteAppGame(gameId));
+      setGameError("");
+      setGameToDelete(null);
+    } catch (err) {
+      setGameError(err instanceof Error ? err.message : "No se pudo eliminar el juego.");
+    } finally {
+      setGameSaving(false);
+    }
+  }
+
+  function openEditGame(game: GameOption) {
+    setEditingGame(game);
+    setEditingGameName(game.name);
+    setGameError("");
+  }
+
+  function closeEditGame() {
+    setEditingGame(null);
+    setEditingGameName("");
+  }
+
+  async function saveEditGame() {
+    if (!editingGame) return;
+    const trimmedName = editingGameName.trim();
+    if (!trimmedName) {
+      setGameError("El juego no puede quedar vacio.");
+      return;
+    }
+    if (games.some((game) => game.id !== editingGame.id && game.name.toLowerCase() === trimmedName.toLowerCase())) {
+      setGameError("Ese juego ya esta en la lista.");
+      return;
+    }
+    setGameSaving(true);
+    try {
+      setGames(await updateAppGameName(editingGame.id, trimmedName));
+      setGameError("");
+      closeEditGame();
+    } catch (err) {
+      setGameError(err instanceof Error ? err.message : "No se pudo editar el juego.");
+    } finally {
+      setGameSaving(false);
+    }
   }
 
   function resetVotingFlow() {
@@ -591,6 +871,49 @@ function App() {
     }
   }
 
+  async function addResultRangeToMyVote(range: Range) {
+    if (!voterName) return;
+    const baseRanges = currentVote?.canPlay ? currentVote.ranges : canPlay === true ? ranges.filter(isCompleteRange) : [];
+    const exists = baseRanges.some((item) => item.start === range.start && item.end === range.end);
+    if (exists) {
+      setError("Ese rango ya esta en tu voto.");
+      return;
+    }
+    const nextRanges = [...baseRanges, range];
+    setSaving(true);
+    setError("");
+    try {
+      const savedSummary = await saveAppVote(voterName, true, nextRanges, currentVote?.comment ?? comment);
+      setSummary(savedSummary);
+      setCanPlay(true);
+      setRanges(nextRanges);
+      setSavedRanges(nextRanges);
+      setCollapsedRanges(Object.fromEntries(nextRanges.map((_, index) => [index, true])));
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "No se pudo agregar el rango.");
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  async function removeResultRangeFromMyVote(index: number) {
+    if (!voterName || !currentVote?.canPlay) return;
+    const nextRanges = currentVote.ranges.filter((_, itemIndex) => itemIndex !== index);
+    setSaving(true);
+    setError("");
+    try {
+      const savedSummary = await saveAppVote(voterName, true, nextRanges, currentVote.comment);
+      setSummary(savedSummary);
+      setRanges(nextRanges.length ? nextRanges : [DEFAULT_RANGE]);
+      setSavedRanges(nextRanges);
+      setCollapsedRanges(Object.fromEntries(nextRanges.map((_, rangeIndex) => [rangeIndex, true])));
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "No se pudo borrar el rango.");
+    } finally {
+      setSaving(false);
+    }
+  }
+
   function unlockAdmin() {
     setAdminError("");
     if (!ADMIN_PIN) {
@@ -627,45 +950,51 @@ function App() {
 
   return (
     <main className="app-shell">
-      <header className="topbar">
-        <div className="topbar-inner">
-          <div>
-            <p className="eyebrow">Vicio manager</p>
-            <h1>HOY SE JUEGA?</h1>
-            <div className="meta-row">
-              <span>
-                <CalendarDays size={16} />
-                {dateLabel}
-              </span>
-              <span>
-                <Clock3 size={16} />
-                Buenos Aires
-              </span>
+      <div className="app-layout">
+        <div className="app-main">
+          <header className="topbar">
+            <div className="topbar-inner">
+              <div>
+                <p className="eyebrow">Chupapig manager</p>
+                <h1>POR UN VICIO MEJOR</h1>
+                <div className="meta-row">
+                  <span>
+                    <CalendarDays size={16} />
+                    {dateLabel}
+                  </span>
+                </div>
+              </div>
+              <AdminControls
+                adminDeleting={adminDeleting}
+                adminError={adminError}
+                adminOpen={adminOpen}
+                adminPin={adminPin}
+                adminUnlocked={adminUnlocked}
+                adminConfirming={adminConfirming}
+                onCancelConfirm={() => setAdminConfirming(false)}
+                onDelete={deleteDayVotes}
+                onPinChange={setAdminPin}
+                onRequestDelete={() => setAdminConfirming(true)}
+                onToggle={() => setAdminOpen((value) => !value)}
+                onUnlock={unlockAdmin}
+              />
             </div>
-          </div>
-          <AdminControls
-            adminDeleting={adminDeleting}
-            adminError={adminError}
-            adminOpen={adminOpen}
-            adminPin={adminPin}
-            adminUnlocked={adminUnlocked}
-            adminConfirming={adminConfirming}
-            onCancelConfirm={() => setAdminConfirming(false)}
-            onDelete={deleteDayVotes}
-            onPinChange={setAdminPin}
-            onRequestDelete={() => setAdminConfirming(true)}
-            onToggle={() => setAdminOpen((value) => !value)}
-            onUnlock={unlockAdmin}
-          />
-        </div>
-      </header>
+          </header>
 
-      <div className="content-grid">
-        <section className="space-y-4">
-          <div className="panel vote-panel">
-            <h2 className="panel-title step-title">
-              <span>1</span>
-              <UserRound size={18} />
+          <div className="section-switch" aria-label="Secciones">
+            <button className={activeSection === "today" ? "active" : ""} onClick={() => setActiveSection("today")}>
+              HOY SE JUEGA?
+            </button>
+            <button className={activeSection === "game" ? "active" : ""} onClick={() => setActiveSection("game")}>
+              QUE SE JUEGA?
+            </button>
+          </div>
+
+          <section className="panel voter-panel-global">
+            <h2 className="panel-title step-title sidebar-title">
+              <span>
+                <UserRound size={15} />
+              </span>
               CHUPAPIG QUE VOTA:
             </h2>
             <div className="voter-grid">
@@ -690,144 +1019,280 @@ function App() {
                 </div>
               </div>
             ) : null}
+          </section>
 
-            {voterName ? (
-              <div className="step-block">
-                <h2 className="panel-title step-title">
-                  <span>2</span>
-                  DISPONIBILIDAD
-                </h2>
-                <div className="segmented" aria-label="Disponibilidad">
-                  <button className={canPlay === true ? "active" : ""} onClick={() => setCanPlay(true)}>
-                    Puedo jugar
-                  </button>
-                  <button className={canPlay === false ? "active danger" : ""} onClick={() => setCanPlay(false)}>
-                    No puedo
-                  </button>
-                </div>
-              </div>
-            ) : null}
+          {activeSection === "today" ? (
+            <div className="content-grid">
+              <section className="space-y-4">
+                {voterName ? (
+                  <div className="panel vote-panel">
+                    <div className="step-block first-step">
+                      <h2 className="panel-title step-title">
+                        <span>1</span>
+                        DISPONIBILIDAD
+                      </h2>
+                      <div className="segmented" aria-label="Disponibilidad">
+                        <button className={canPlay === true ? "active" : ""} onClick={() => setCanPlay(true)}>
+                          Puedo jugar
+                        </button>
+                        <button className={canPlay === false ? "active danger" : ""} onClick={() => setCanPlay(false)}>
+                          No puedo
+                        </button>
+                      </div>
+                    </div>
 
-            {voterName && canPlay === true ? (
-              <div className="step-block">
-                <h2 className="panel-title step-title">
-                  <span>3</span>
-                  RANGO HORARIO
-                </h2>
-                <div className="space-y-4">
-                  {ranges.map((range, index) => (
-                    <RangeEditor
-                      index={index}
-                      key={index}
-                      range={range}
-                      canRemove={ranges.length > 1}
-                      date={summary?.date}
-                      onChange={updateRange}
-                      onRemove={removeRange}
-                      onReset={resetRange}
-                      dialModes={dialModes}
-                      onDialModeChange={updateDialMode}
-                      activeField={activeRangeFields[index] ?? "start"}
-                      onActiveFieldChange={updateActiveRangeField}
-                      collapsed={Boolean(collapsedRanges[index])}
-                      onConfirm={confirmRange}
-                      onEdit={editRange}
-                      onCancel={cancelRangeEdit}
-                      canCancel={Boolean(savedRanges[index])}
-                    />
-                  ))}
-                  <button className="add-range-button" onClick={addRange} title="Agregar otro rango">
-                    <Plus size={17} />
-                  </button>
-                </div>
-              </div>
-            ) : null}
+                  {voterName && canPlay === true ? (
+                    <div className="step-block">
+                      <h2 className="panel-title step-title">
+                        <span>2</span>
+                        RANGO HORARIO
+                      </h2>
+                      <div className="space-y-4">
+                        {ranges.map((range, index) => (
+                          <RangeEditor
+                            index={index}
+                            key={index}
+                            range={range}
+                            canRemove={ranges.length > 1}
+                            date={summary?.date}
+                            onChange={updateRange}
+                            onRemove={removeRange}
+                            onReset={resetRange}
+                            dialModes={dialModes}
+                            onDialModeChange={updateDialMode}
+                            activeField={activeRangeFields[index] ?? "start"}
+                            onActiveFieldChange={updateActiveRangeField}
+                            collapsed={Boolean(collapsedRanges[index])}
+                            onConfirm={confirmRange}
+                            onEdit={editRange}
+                            onCancel={cancelRangeEdit}
+                            canCancel={Boolean(savedRanges[index])}
+                          />
+                        ))}
+                        <button className="add-range-button" onClick={addRange} title="Agregar otro rango">
+                          <Plus size={17} />
+                        </button>
+                      </div>
+                    </div>
+                  ) : null}
 
-            {voterName && canPlay === false ? (
-              <div className="notice">
-                <X size={18} />
-                Tu voto quedara guardado como no puedo jugar hoy.
-              </div>
-            ) : null}
+                  {voterName && canPlay === false ? (
+                    <div className="notice">
+                      <X size={18} />
+                      Tu voto quedara guardado como no puedo jugar hoy.
+                    </div>
+                  ) : null}
 
-            {error ? <p className="error-text">{error}</p> : null}
+                  {error ? <p className="error-text">{error}</p> : null}
 
-            {voterName && canPlay !== null ? (
-              <>
-                <label className="comment-field">
-                  <span>Comentarios:</span>
-                  <textarea
-                    maxLength={180}
-                    placeholder="Opcional"
-                    value={comment}
-                    onChange={(event) => setComment(event.target.value)}
-                  />
-                </label>
-                <button className="primary-button w-full" onClick={saveVote} disabled={saving || !canSave}>
-                  {saving ? <Loader2 className="animate-spin" size={18} /> : <Save size={18} />}
-                  GUARDAR VOTO
-                </button>
-              </>
-            ) : null}
-          </div>
-        </section>
-
-        <section className="space-y-6">
-          <div className="panel">
-            <div className="section-heading">
-              <h2 className="panel-title">RESULTADOS DEL DIA</h2>
-              <span>{summary?.votes.length ?? 0} confirmaron</span>
-            </div>
-            <div className="mt-4 grid gap-3">
-              {sortedVotes.length ? (
-                sortedVotes.map((vote) => <VoteCard key={vote.voter} vote={vote} />)
-              ) : (
-                <p className="empty-state">Todavia no hay votos cargados para hoy.</p>
-              )}
-            </div>
-          </div>
-
-          <div className="panel">
-            <div className="section-heading">
-              <h2 className="panel-title">COINCIDENCIAS</h2>
-              <span>{filteredOverlaps.length} matches</span>
-            </div>
-            <div className="overlap-filter" aria-label="Filtrar coincidencias por jugador">
-              <span>Filtrar por:</span>
-              <button
-                className={overlapFilters.length < 2 ? "active" : ""}
-                onClick={() => setOverlapFilters([])}
-              >
-                TODOS
-              </button>
-              {VOTERS.map((name) => (
-                <button
-                  className={overlapFilters.includes(name) ? "active" : ""}
-                  key={name}
-                  onClick={() => toggleOverlapFilter(name)}
-                >
-                  {name}
-                </button>
-              ))}
-            </div>
-            <div className="overlap-list mt-4 grid gap-3">
-              {filteredOverlaps.length ? (
-                filteredOverlaps.map((overlap) => (
-                  <div className="overlap-row" key={`${overlap.start}-${overlap.end}-${overlap.voters.join("-")}`}>
-                    <strong>
-                      {overlap.start} hs a {overlap.end} hs
-                    </strong>
-                    <span>{overlap.voters.join(", ")}</span>
+                  {voterName && canPlay !== null ? (
+                    <>
+                      <label className="comment-field">
+                        <span>Comentarios:</span>
+                        <textarea
+                          maxLength={180}
+                          placeholder="Opcional"
+                          value={comment}
+                          onChange={(event) => setComment(event.target.value)}
+                        />
+                      </label>
+                      <button className="primary-button w-full" onClick={saveVote} disabled={saving || !canSave}>
+                        {saving ? <Loader2 className="animate-spin" size={18} /> : <Save size={18} />}
+                        GUARDAR VOTO
+                      </button>
+                    </>
+                  ) : null}
                   </div>
-                ))
-              ) : summary?.overlaps.length ? (
-                <p className="empty-state">No hay coincidencias con ese filtro.</p>
-              ) : (
-                <p className="empty-state">Cuando haya horarios compatibles entre dos o mas personas, apareceran aca.</p>
-              )}
+                ) : null}
+              </section>
+
+              <section className="space-y-6">
+                <div className="panel">
+                  <div className="section-heading">
+                    <h2 className="panel-title">RESULTADOS DEL DIA</h2>
+                    <span>{summary?.votes.length ?? 0} confirmaron</span>
+                  </div>
+                  <div className="mt-4 grid gap-3">
+                    {sortedVotes.length ? (
+                      sortedVotes.map((vote) => (
+                        <VoteCard
+                          key={vote.voter}
+                          vote={vote}
+                          currentVoter={voterName}
+                          onAddRange={addResultRangeToMyVote}
+                          onRemoveOwnRange={removeResultRangeFromMyVote}
+                        />
+                      ))
+                    ) : (
+                      <p className="empty-state">Todavia no hay votos cargados para hoy.</p>
+                    )}
+                  </div>
+                </div>
+
+                <div className="panel">
+                  <div className="section-heading">
+                    <h2 className="panel-title">COINCIDENCIAS</h2>
+                    <span>{filteredOverlaps.length} matches</span>
+                  </div>
+                  <div className="overlap-filter" aria-label="Filtrar coincidencias por jugador">
+                    <span>Filtrar por:</span>
+                    <button
+                      className={overlapFilters.length < 2 ? "active" : ""}
+                      onClick={() => setOverlapFilters([])}
+                    >
+                      TODOS
+                    </button>
+                    {VOTERS.map((name) => (
+                      <button
+                        className={overlapFilters.includes(name) ? "active" : ""}
+                        key={name}
+                        onClick={() => toggleOverlapFilter(name)}
+                      >
+                        {name}
+                      </button>
+                    ))}
+                  </div>
+                  <div className="overlap-list mt-4 grid gap-3">
+                    {filteredOverlaps.length ? (
+                      filteredOverlaps.map((overlap) => (
+                        <div className="overlap-row" key={`${overlap.start}-${overlap.end}-${overlap.voters.join("-")}`}>
+                          <strong>
+                            {overlap.start} hs a {overlap.end} hs
+                          </strong>
+                          <span>{overlap.voters.join(", ")}</span>
+                        </div>
+                      ))
+                    ) : summary?.overlaps.length ? (
+                      <p className="empty-state">No hay coincidencias con ese filtro.</p>
+                    ) : (
+                      <p className="empty-state">Cuando haya horarios compatibles entre dos o mas personas, apareceran aca.</p>
+                    )}
+                  </div>
+                </div>
+              </section>
             </div>
-          </div>
-        </section>
+          ) : (
+            <section className="panel game-panel">
+                <div className="section-heading">
+                  <h2 className="panel-title">QUE SE JUEGA?</h2>
+                </div>
+
+              <div className="game-add-row">
+                <input
+                  placeholder="Nombre del juego"
+                  value={newGameName}
+                  onChange={(event) => {
+                    setNewGameName(event.target.value);
+                    setGameError("");
+                  }}
+                  onKeyDown={(event) => {
+                    if (event.key === "Enter") {
+                      addGame();
+                    }
+                  }}
+                  disabled={gameSaving}
+                />
+                <button className="secondary-button" onClick={addGame} disabled={gameSaving}>
+                  <Plus size={17} />
+                  AGREGAR JUEGO
+                </button>
+              </div>
+
+              {gameError ? <p className="error-text">{gameError}</p> : null}
+
+              <div className="game-list">
+                {gamesLoading ? (
+                  <p className="empty-state">Cargando juegos...</p>
+                ) : sortedGames.length ? (
+                  sortedGames.map((game) => {
+                    const checked = voterName ? game.voters.includes(voterName) : false;
+                    return (
+                      <article className="game-row" key={game.id}>
+                        <div className="game-main">
+                          <label>
+                            <input
+                              type="checkbox"
+                              checked={checked}
+                              onChange={() => toggleGameVote(game)}
+                              disabled={!voterName || gameSaving}
+                            />
+                            <span>{game.name}</span>
+                          </label>
+                        </div>
+                        <div className="game-voters">
+                          {game.voters.length ? (
+                            game.voters.map((voter) => <span key={voter}>{voter}</span>)
+                          ) : (
+                            <em>Sin votos</em>
+                          )}
+                        </div>
+                        <div className="game-actions">
+                          <button className="icon-button small" onClick={() => openEditGame(game)} title="Editar juego" disabled={gameSaving}>
+                            <Pencil size={15} />
+                          </button>
+                          <button className="icon-button small danger-button" onClick={() => setGameToDelete(game)} title="Eliminar juego" disabled={gameSaving}>
+                            <Trash2 size={15} />
+                          </button>
+                        </div>
+                      </article>
+                    );
+                  })
+                ) : (
+                  <p className="empty-state">Todavia no hay juegos cargados.</p>
+                )}
+              </div>
+
+              {editingGame ? (
+                <div className="inline-modal" role="dialog" aria-modal="true" aria-label="Editar juego">
+                  <div className="inline-modal-panel">
+                    <div>
+                      <h3>EDITAR JUEGO</h3>
+                      <p>Los votos existentes se conservan.</p>
+                    </div>
+                    <input
+                      value={editingGameName}
+                      onChange={(event) => setEditingGameName(event.target.value)}
+                      onKeyDown={(event) => {
+                        if (event.key === "Enter") saveEditGame();
+                        if (event.key === "Escape") closeEditGame();
+                      }}
+                      autoFocus
+                      disabled={gameSaving}
+                    />
+                    <div className="inline-modal-actions">
+                      <button className="secondary-button" onClick={closeEditGame} disabled={gameSaving}>
+                        CANCELAR
+                      </button>
+                      <button className="primary-button" onClick={saveEditGame} disabled={gameSaving}>
+                        GUARDAR
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              ) : null}
+
+              {gameToDelete ? (
+                <div className="inline-modal" role="dialog" aria-modal="true" aria-label="Eliminar juego">
+                  <div className="inline-modal-panel">
+                    <div>
+                      <h3>ELIMINAR JUEGO</h3>
+                      <p>Seguro que queres eliminar {gameToDelete.name}? Tambien se borran sus votos.</p>
+                    </div>
+                    <div className="inline-modal-actions">
+                      <button className="secondary-button" onClick={() => setGameToDelete(null)} disabled={gameSaving}>
+                        CANCELAR
+                      </button>
+                      <button className="secondary-button danger-action" onClick={() => removeGame(gameToDelete.id)} disabled={gameSaving}>
+                        <Trash2 size={15} />
+                        ELIMINAR
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              ) : null}
+            </section>
+          )}
+        </div>
       </div>
     </main>
   );
@@ -1156,7 +1621,20 @@ function ClockOption({
   );
 }
 
-function VoteCard({ vote }: { vote: Vote }) {
+function VoteCard({
+  vote,
+  currentVoter,
+  onAddRange,
+  onRemoveOwnRange,
+}: {
+  vote: Vote;
+  currentVoter: string;
+  onAddRange: (range: Range) => void;
+  onRemoveOwnRange: (index: number) => void;
+}) {
+  const isOwnVote = Boolean(currentVoter) && vote.voter === currentVoter;
+  const canCopyRange = Boolean(currentVoter) && !isOwnVote;
+
   return (
     <article className="vote-card">
       <div className="vote-card-header">
@@ -1165,9 +1643,21 @@ function VoteCard({ vote }: { vote: Vote }) {
       </div>
       {vote.canPlay ? (
         <div className="range-list">
-          {vote.ranges.map((range) => (
-            <span key={`${range.start}-${range.end}`}>
-              {range.start} hs a {range.end} hs
+          {vote.ranges.map((range, index) => (
+            <span className="range-chip" key={`${range.start}-${range.end}-${index}`}>
+              <strong>
+                {range.start} hs a {range.end} hs
+              </strong>
+              {canCopyRange ? (
+                <button onClick={() => onAddRange(range)} title="Agregar este rango a mi voto">
+                  <Plus size={14} />
+                </button>
+              ) : null}
+              {isOwnVote ? (
+                <button className="danger" onClick={() => onRemoveOwnRange(index)} title="Borrar este rango de mi voto">
+                  <X size={14} />
+                </button>
+              ) : null}
             </span>
           ))}
         </div>
