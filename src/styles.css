@@ -438,36 +438,77 @@ button {
 }
 
 .voter-grid {
-  @apply mx-auto grid max-w-3xl grid-cols-2 gap-2;
+  @apply mx-auto grid max-w-4xl grid-cols-1 gap-x-8 gap-y-5 sm:grid-cols-2;
 }
 
 .voter-button {
-  @apply flex h-14 items-center justify-between rounded-md border px-3 text-left text-2xl font-semibold transition;
+  @apply relative flex min-h-24 items-center justify-start border-0 bg-transparent px-0 py-0 text-left text-2xl font-semibold transition;
   font-family: "ArcadeUsers", "ArcadePixel", monospace;
   letter-spacing: 0.04em;
-  border-color: rgba(164, 236, 212, 0.14);
-  background: rgba(255, 255, 255, 0.06);
   color: rgba(247, 255, 252, 0.78);
 }
 
-.voter-button span {
+.voter-button-content {
+  @apply flex min-w-0 items-center;
+  width: 100%;
+}
+
+.voter-avatar {
+  @apply relative z-10 h-24 w-24 shrink-0 rounded-full object-cover;
+  border: 4px solid rgba(234, 116, 116, 0.9);
+  background: rgba(18, 18, 33, 0.5);
+  box-shadow:
+    0 0 0 2px rgba(255, 79, 216, 0.2),
+    0 0 18px rgba(234, 116, 116, 0.24),
+    0 0 22px rgba(56, 200, 204, 0.18);
+}
+
+.voter-avatar.small {
+  @apply h-11 w-11 border-2;
+}
+
+.voter-button-content > span {
+  @apply relative -ml-5 flex min-h-16 flex-1 items-center rounded-md border py-3 pl-8 pr-4;
+  border-color: rgba(255, 79, 216, 0.58);
+  background:
+    linear-gradient(90deg, rgba(255, 79, 216, 0.12), rgba(255, 255, 255, 0.05)),
+    rgba(255, 255, 255, 0.06);
+  box-shadow:
+    0 0 0 1px rgba(164, 236, 212, 0.08) inset,
+    0 0 14px rgba(255, 79, 216, 0.1);
   text-shadow:
     1px 0 0 rgba(255, 79, 216, 0.62),
     0 0 8px rgba(255, 79, 216, 0.18);
 }
 
 .voter-button:hover {
+  transform: translateY(-1px);
+}
+
+.voter-button:hover .voter-button-content > span {
   border-color: rgba(56, 200, 204, 0.62);
 }
 
 .voter-button.active {
-  background: rgba(56, 200, 204, 0.2);
-  border-color: var(--cyan);
   color: white;
-  box-shadow: inset 0 0 0 1px rgba(164, 236, 212, 0.12);
 }
 
-.voter-button.active span {
+.voter-button.active .voter-avatar {
+  border-color: rgba(164, 236, 212, 0.9);
+  box-shadow:
+    0 0 0 1px rgba(255, 79, 216, 0.52),
+    0 0 16px rgba(56, 200, 204, 0.38),
+    0 0 20px rgba(255, 79, 216, 0.2);
+}
+
+.voter-button.active .voter-button-content > span {
+  border-color: var(--cyan);
+  background:
+    linear-gradient(90deg, rgba(56, 200, 204, 0.24), rgba(255, 255, 255, 0.07)),
+    rgba(56, 200, 204, 0.1);
+  box-shadow:
+    0 0 0 1px rgba(164, 236, 212, 0.18) inset,
+    0 0 18px rgba(56, 200, 204, 0.2);
   text-shadow:
     1px 0 0 rgba(255, 79, 216, 0.95),
     -1px 0 0 rgba(56, 200, 204, 0.8),
@@ -476,29 +517,85 @@ button {
 }
 
 .voter-button.pending {
-  border-color: rgba(255, 79, 216, 0.72);
-  background: rgba(255, 79, 216, 0.12);
   color: white;
-  box-shadow: 0 0 12px rgba(255, 79, 216, 0.18);
+}
+
+.voter-button.pending .voter-avatar {
+  border-color: rgba(255, 79, 216, 0.9);
+}
+
+.voter-button.pending .voter-button-content > span {
+  border-color: rgba(255, 79, 216, 0.72);
+  background:
+    linear-gradient(90deg, rgba(255, 79, 216, 0.22), rgba(255, 255, 255, 0.06)),
+    rgba(255, 79, 216, 0.08);
+  box-shadow:
+    0 0 0 1px rgba(255, 79, 216, 0.14) inset,
+    0 0 16px rgba(255, 79, 216, 0.18);
+}
+
+.voter-button > svg {
+  @apply absolute right-4 z-20;
+}
+
+@media (max-width: 520px) {
+  .voter-button {
+    @apply min-h-20 text-xl;
+  }
+
+  .voter-avatar {
+    @apply h-20 w-20;
+  }
+
+  .voter-button-content > span {
+    @apply min-h-14 pl-7;
+  }
 }
 
 .voter-confirm {
-  @apply mx-auto mt-3 w-full max-w-3xl rounded-md border p-3;
-  border-color: rgba(164, 236, 212, 0.2);
-  background: rgba(18, 18, 33, 0.34);
+  @apply mx-auto mt-6 flex w-full max-w-4xl items-center gap-5 rounded-lg border py-5 pl-8 pr-5;
+  border-color: rgba(255, 79, 216, 0.42);
+  background:
+    radial-gradient(circle at 12% 50%, rgba(56, 200, 204, 0.15), transparent 30%),
+    rgba(18, 18, 33, 0.48);
+  box-shadow:
+    0 0 0 1px rgba(164, 236, 212, 0.08) inset,
+    0 18px 45px rgba(17, 16, 31, 0.22);
+}
+
+.voter-confirm-avatar {
+  @apply h-28 w-28 shrink-0 rounded-full object-cover;
+  border: 4px solid rgba(234, 116, 116, 0.92);
+  background: rgba(18, 18, 33, 0.5);
+  box-shadow:
+    0 0 0 2px rgba(255, 79, 216, 0.22),
+    0 0 22px rgba(234, 116, 116, 0.28),
+    0 0 26px rgba(56, 200, 204, 0.16);
+}
+
+.voter-confirm-body {
+  @apply min-w-0 flex-1;
 }
 
 .voter-confirm p {
-  @apply text-sm font-semibold;
+  @apply text-center text-lg font-semibold uppercase leading-relaxed sm:text-xl;
   color: rgba(247, 255, 252, 0.86);
 }
 
-.voter-confirm div {
-  @apply mt-3 flex flex-wrap justify-center gap-2;
+.voter-confirm strong {
+  color: var(--mint);
+  text-shadow:
+    1px 0 0 rgba(255, 79, 216, 0.95),
+    -1px 0 0 rgba(56, 200, 204, 0.78),
+    0 0 12px rgba(255, 79, 216, 0.42);
+}
+
+.voter-confirm-body > div {
+  @apply mt-5 flex flex-wrap justify-center gap-3;
 }
 
 .voter-confirm button {
-  @apply h-10 min-w-40 rounded-md border px-5 text-xs font-semibold transition;
+  @apply h-12 min-w-44 rounded-md border px-5 text-xs font-semibold transition;
   border-color: rgba(164, 236, 212, 0.16);
   background: rgba(255, 255, 255, 0.06);
   color: rgba(247, 255, 252, 0.72);
@@ -508,6 +605,20 @@ button {
   border-color: rgba(56, 200, 204, 0.58);
   background: rgba(56, 200, 204, 0.16);
   color: var(--mint);
+}
+
+@media (max-width: 640px) {
+  .voter-confirm {
+    @apply flex-col gap-3 p-4;
+  }
+
+  .voter-confirm-avatar {
+    @apply h-24 w-24;
+  }
+
+  .voter-confirm button {
+    @apply w-full;
+  }
 }
 
 .segmented {
@@ -540,6 +651,17 @@ button {
 .range-card-collapsed {
   @apply flex items-center justify-between gap-3 py-3;
   background: rgba(56, 200, 204, 0.08);
+}
+
+.range-card-deleted {
+  opacity: 0.54;
+  border-color: rgba(247, 255, 252, 0.14);
+  background: rgba(247, 255, 252, 0.05);
+}
+
+.range-card-deleted .range-collapsed-summary strong {
+  color: rgba(247, 255, 252, 0.58);
+  text-decoration: line-through;
 }
 
 .range-card-header {
@@ -646,10 +768,14 @@ button {
 }
 
 .add-range-button {
-  @apply flex h-11 w-11 items-center justify-center rounded-md border transition;
+  @apply flex h-11 w-11 items-center justify-center gap-2 rounded-md border transition;
   border-color: rgba(164, 236, 212, 0.24);
   background: rgba(255, 255, 255, 0.06);
   color: var(--mint);
+}
+
+.add-range-button.wide {
+  @apply w-full px-4 text-sm font-semibold;
 }
 
 .add-range-button:hover {
@@ -886,10 +1012,40 @@ button {
   @apply flex flex-col gap-1 sm:flex-row sm:items-start sm:justify-between;
 }
 
+.vote-player {
+  @apply flex min-w-0 items-center gap-3;
+}
+
+.player-avatar {
+  @apply shrink-0 rounded-full object-cover;
+  border: 2px solid rgba(234, 116, 116, 0.92);
+  background: rgba(18, 18, 33, 0.52);
+  box-shadow:
+    0 0 0 1px rgba(255, 79, 216, 0.52),
+    0 0 16px rgba(234, 116, 116, 0.34),
+    0 0 20px rgba(255, 79, 216, 0.2);
+}
+
+.player-avatar.small {
+  @apply h-10 w-10;
+}
+
+.player-avatar.mini {
+  @apply h-10 w-10;
+}
+
+.player-avatar.micro {
+  @apply h-6 w-6;
+}
+
 .vote-card h3 {
-  @apply text-lg font-semibold;
+  @apply text-2xl font-semibold;
   font-family: "ArcadeUsers", "ArcadePixel", monospace;
   color: white;
+  text-shadow:
+    1px 0 0 rgba(255, 79, 216, 0.78),
+    -1px 0 0 rgba(56, 200, 204, 0.58),
+    0 0 10px rgba(255, 79, 216, 0.26);
 }
 
 .vote-card p {
@@ -940,11 +1096,38 @@ button {
   color: #ffd2d2;
 }
 
+.no-vote {
+  @apply inline-flex w-fit rounded-md border px-3 py-2 text-sm font-semibold;
+  border-color: rgba(164, 236, 212, 0.14);
+  background: rgba(18, 18, 33, 0.2);
+  color: rgba(247, 255, 252, 0.58);
+}
+
 .vote-comment {
   @apply rounded-md border px-3 py-2 text-sm;
   border-color: rgba(164, 236, 212, 0.12);
   background: rgba(18, 18, 33, 0.24);
   color: rgba(247, 255, 252, 0.72);
+}
+
+.range-suggestions {
+  @apply mt-4 rounded-md border p-3;
+  border-color: rgba(164, 236, 212, 0.12);
+  background: rgba(18, 18, 33, 0.18);
+}
+
+.range-suggestions h3 {
+  @apply mb-2 text-xs font-semibold uppercase;
+  color: rgba(247, 255, 252, 0.58);
+  letter-spacing: 0.08em;
+}
+
+.range-suggestions > div {
+  @apply flex flex-wrap gap-2;
+}
+
+.range-suggestions .range-chip {
+  @apply cursor-pointer;
 }
 
 .overlap-filter {
@@ -958,10 +1141,13 @@ button {
 }
 
 .overlap-filter button {
-  @apply min-h-9 rounded-md border px-3 text-xs font-semibold uppercase transition;
+  @apply inline-flex min-h-10 items-center gap-2 rounded-md border px-3 text-xs font-semibold uppercase transition;
   border-color: rgba(164, 236, 212, 0.14);
   background: rgba(255, 255, 255, 0.05);
   color: rgba(247, 255, 252, 0.66);
+  text-shadow:
+    1px 0 0 rgba(255, 79, 216, 0.46),
+    0 0 8px rgba(255, 79, 216, 0.12);
 }
 
 .overlap-filter button:hover {
@@ -973,12 +1159,14 @@ button {
   border-color: rgba(56, 200, 204, 0.9);
   background: rgba(56, 200, 204, 0.18);
   color: var(--mint);
+  text-shadow:
+    1px 0 0 rgba(255, 79, 216, 0.78),
+    -1px 0 0 rgba(56, 200, 204, 0.52),
+    0 0 10px rgba(255, 79, 216, 0.28);
 }
 
-.overlap-filter button.clear-filter {
-  border-color: rgba(255, 79, 216, 0.34);
-  background: rgba(255, 79, 216, 0.1);
-  color: #ffd4f6;
+.overlap-filter button:not(.active) {
+  opacity: 0.48;
 }
 
 .overlap-list {
@@ -996,6 +1184,23 @@ button {
 .overlap-row span {
   @apply text-sm font-medium;
   color: var(--mint);
+}
+
+.avatar-stack {
+  @apply flex items-center justify-end;
+}
+
+.avatar-stack .player-avatar {
+  margin-left: -0.55rem;
+}
+
+.avatar-stack .player-avatar:first-child {
+  margin-left: 0;
+}
+
+.avatar-stack .player-avatar:hover {
+  @apply z-10;
+  transform: translateY(-2px);
 }
 
 @media (max-width: 520px) {

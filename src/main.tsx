@@ -17,14 +17,17 @@ import "./styles.css";
 type Range = {
   start: string;
   end: string;
+  deleted?: boolean;
 };
 
+type TimeField = "start" | "end";
 type DialModes = Record<string, "hour" | "minute">;
-type ActiveRangeFields = Record<string, keyof Range>;
+type ActiveRangeFields = Record<string, TimeField>;
 type CollapsedRanges = Record<number, boolean>;
 type AppSection = "today" | "game";
 
 type Vote = {
+  date?: string;
   voter: string;
   canPlay: boolean;
   ranges: Range[];
@@ -47,6 +50,14 @@ type Summary = {
     end: string;
     voters: string[];
   }[];
+  suggestions: RangeSuggestion[];
+};
+
+type RangeSuggestion = {
+  start: string;
+  end: string;
+  voters: string[];
+  hits: number;
 };
 
 type SupabaseVoteRow = {
@@ -79,6 +90,12 @@ const SUPABASE_ANON_KEY = import.meta.env.VITE_SUPABASE_ANON_KEY as string | und
 const ADMIN_PIN = import.meta.env.VITE_ADMIN_PIN as string | undefined;
 const USE_SUPABASE = Boolean(SUPABASE_URL && SUPABASE_ANON_KEY);
 const VOTERS = ["MISHA", "LEKU", "SEPIA", "ICHITBO"];
+const VOTER_AVATARS: Record<string, string> = {
+  MISHA: "/avatars/misha.png",
+  LEKU: "/avatars/leku.png",
+  SEPIA: "/avatars/sepia.png",
+  ICHITBO: "/avatars/ichitbo.png",
+};
 const GAMES_STORAGE_KEY = "chupapig-manager-games";
 const MINUTES = Array.from({ length: 12 }, (_, index) => String(index * 5).padStart(2, "0"));
 const HOURS = Array.from({ length: 24 }, (_, index) => String(index).padStart(2, "0"));
@@ -126,8 +143,16 @@ function isCompleteRange(range: Range) {
   return isSelectedTime(range.start) && isSelectedTime(range.end);
 }
 
+function isActiveRange(range: Range) {
+  return !range.deleted;
+}
+
+function isActiveCompleteRange(range: Range) {
+  return isActiveRange(range) && isCompleteRange(range);
+}
+
 function isValidRange(range: Range) {
-  return isCompleteRange(range) && timeToMinutes(range.end) - timeToMinutes(range.start) >= MIN_RANGE_MINUTES;
+  return isActiveCompleteRange(range) && timeToMinutes(range.end) - timeToMinutes(range.start) >= MIN_RANGE_MINUTES;
 }
 
 function minutesToTime(value: number) {
@@ -215,6 +240,7 @@ function nowBuenosAires() {
 
 function voteFromSupabaseRow(row: SupabaseVoteRow): Vote {
   return {
+    date: row.date,
     voter: row.voter,
     canPlay: row.can_play,
     ranges: row.ranges,
@@ -231,6 +257,14 @@ function gameFromSupabaseRow(row: SupabaseGameRow): GameOption {
       .map((vote) => vote.voter)
       .filter((voter) => VOTERS.includes(voter)),
   };
+}
+
+function friendlyGameError(error: unknown) {
+  const message = error instanceof Error ? error.message : "";
+  if (message.includes("PGRST205") || message.includes("public.games") || message.includes("schema cache")) {
+    return "Error en base de datos.";
+  }
+  return message || "No se pudieron cargar los juegos.";
 }
 
 function toOverlap(start: number, end: number, voters: string[]) {
@@ -251,6 +285,10 @@ function sortOverlaps(overlaps: Summary["overlaps"]) {
 
     return timeToMinutes(a.start) - timeToMinutes(b.start);
   });
+}
+
+function rangeDuration(range: Range) {
+  return timeToMinutes(range.end) - timeToMinutes(range.start);
 }
 
 function combinations<T>(items: T[], size: number): T[][] {
@@ -313,6 +351,50 @@ function calculateOverlaps(votes: Vote[]): Summary["overlaps"] {
   return sortOverlaps(overlaps);
 }
 
+function calculateRangeSuggestions(votes: Vote[]): RangeSuggestion[] {
+  const votesByDate = votes.reduce<Record<string, Vote[]>>((groups, vote) => {
+    const date = vote.date ?? vote.updatedAt.slice(0, 10);
+    groups[date] = [...(groups[date] ?? []), vote];
+    return groups;
+  }, {});
+  const suggestions = new Map<string, RangeSuggestion>();
+
+  Object.values(votesByDate).forEach((dateVotes) => {
+    const latestVoteByVoter = new Map<string, Vote>();
+    const seenRangesToday = new Set<string>();
+    dateVotes.forEach((vote) => {
+      const current = latestVoteByVoter.get(vote.voter);
+      if (!current || Date.parse(vote.updatedAt) > Date.parse(current.updatedAt)) {
+        latestVoteByVoter.set(vote.voter, vote);
+      }
+    });
+    calculateOverlaps([...latestVoteByVoter.values()])
+      .filter((overlap) => overlap.voters.length >= 3)
+      .forEach((overlap) => {
+        const key = `${overlap.start}-${overlap.end}`;
+        const current = suggestions.get(key);
+        const voters = current && current.voters.length > overlap.voters.length ? current.voters : overlap.voters;
+        suggestions.set(key, {
+          start: overlap.start,
+          end: overlap.end,
+          voters,
+          hits: (current?.hits ?? 0) + (seenRangesToday.has(key) ? 0 : 1),
+        });
+        seenRangesToday.add(key);
+      });
+  });
+
+  return [...suggestions.values()]
+    .sort((a, b) => {
+      const playersDiff = b.voters.length - a.voters.length;
+      if (playersDiff) return playersDiff;
+      const hitsDiff = b.hits - a.hits;
+      if (hitsDiff) return hitsDiff;
+      return rangeDuration(b) - rangeDuration(a);
+    })
+    .slice(0, 4);
+}
+
 async function supabaseRequest<T>(path: string, options?: RequestInit): Promise<T> {
   if (!SUPABASE_URL || !SUPABASE_ANON_KEY) {
     throw new Error("Faltan las variables de Supabase.");
@@ -346,13 +428,18 @@ async function loadAppSummary(): Promise<Summary> {
 
   const date = todayBuenosAires();
   const rows = await supabaseRequest<SupabaseVoteRow[]>(`/votes?date=eq.${date}&select=*&order=voter.asc`);
+  const historicalRows = await supabaseRequest<SupabaseVoteRow[]>(
+    `/votes?date=lt.${date}&select=*&order=date.desc,updated_at.desc&limit=240`,
+  );
   const votes = rows.map(voteFromSupabaseRow);
+  const historicalVotes = historicalRows.map(voteFromSupabaseRow);
 
   return {
     date,
     timezone: "America/Argentina/Buenos_Aires",
     votes,
     overlaps: calculateOverlaps(votes),
+    suggestions: calculateRangeSuggestions(historicalVotes),
   };
 }
 
@@ -378,6 +465,22 @@ async function saveAppVote(voter: string, canPlay: boolean, ranges: Range[], com
     }),
     headers: {
       Prefer: "resolution=merge-duplicates,return=representation",
+    },
+  });
+
+  return loadAppSummary();
+}
+
+async function deleteAppVote(voter: string): Promise<Summary> {
+  if (!USE_SUPABASE) {
+    return saveAppVote(voter, true, [], "");
+  }
+
+  const date = todayBuenosAires();
+  await supabaseRequest<undefined>(`/votes?date=eq.${date}&voter_key=eq.${voter.toLowerCase()}`, {
+    method: "DELETE",
+    headers: {
+      Prefer: "return=minimal",
     },
   });
 
@@ -545,7 +648,7 @@ function App() {
   const [adminDeleting, setAdminDeleting] = useState(false);
   const [adminError, setAdminError] = useState("");
   const [adminConfirming, setAdminConfirming] = useState(false);
-  const [overlapFilters, setOverlapFilters] = useState<string[]>([]);
+  const [overlapFilters, setOverlapFilters] = useState<string[]>(VOTERS);
   const [games, setGames] = useState<GameOption[]>(() => (USE_SUPABASE ? [] : readStoredGames()));
   const [gamesLoading, setGamesLoading] = useState(true);
   const [gameSaving, setGameSaving] = useState(false);
@@ -561,15 +664,22 @@ function App() {
   );
   const filteredOverlaps = useMemo(() => {
     const overlaps = summary?.overlaps ?? [];
-    if (overlapFilters.length < 2) return overlaps;
-    return overlaps.filter(
-      (overlap) =>
-        overlap.voters.length === overlapFilters.length &&
-        overlapFilters.every((voter) => overlap.voters.includes(voter)),
-    );
+    if (overlapFilters.length === VOTERS.length) return overlaps;
+    if (overlapFilters.length < 2) return [];
+    return overlaps.filter((overlap) => overlap.voters.every((voter) => overlapFilters.includes(voter)));
   }, [overlapFilters, summary?.overlaps]);
-  const sortedVotes = useMemo(
-    () => [...(summary?.votes ?? [])].sort((a, b) => Date.parse(b.updatedAt) - Date.parse(a.updatedAt)),
+  const resultVotes = useMemo(
+    () =>
+      VOTERS.map(
+        (name) =>
+          summary?.votes.find((vote) => vote.voter.toLowerCase() === name.toLowerCase()) ?? {
+            voter: name,
+            canPlay: true,
+            ranges: [],
+            comment: "",
+            updatedAt: "",
+          },
+      ),
     [summary?.votes],
   );
   const sortedGames = useMemo(
@@ -601,7 +711,7 @@ function App() {
     try {
       setGames(await loadAppGames());
     } catch (err) {
-      setGameError(err instanceof Error ? err.message : "No se pudieron cargar los juegos.");
+      setGameError(friendlyGameError(err));
     } finally {
       setGamesLoading(false);
     }
@@ -621,7 +731,7 @@ function App() {
   useEffect(() => {
     if (!voterName) {
       setCanPlay(null);
-      setRanges([DEFAULT_RANGE]);
+      setRanges([]);
       setComment("");
       setSavedRanges([]);
       return;
@@ -629,7 +739,7 @@ function App() {
 
     if (currentVote) {
       setCanPlay(currentVote.canPlay);
-      const loadedRanges = currentVote.ranges.length ? currentVote.ranges : [DEFAULT_RANGE];
+      const loadedRanges = currentVote.ranges;
       setRanges(loadedRanges);
       setComment(currentVote.comment);
       setSavedRanges(currentVote.ranges);
@@ -642,7 +752,7 @@ function App() {
     }
 
     setCanPlay(null);
-    setRanges([DEFAULT_RANGE]);
+    setRanges([]);
     setComment("");
     setSavedRanges([]);
     setCollapsedRanges({});
@@ -757,11 +867,13 @@ function App() {
     }
   }
 
-  function resetVotingFlow() {
-    setVoterName("");
+  function resetVotingFlow(options: { keepVoter?: boolean } = {}) {
+    if (!options.keepVoter) {
+      setVoterName("");
+    }
     setPendingVoterName("");
     setCanPlay(null);
-    setRanges([DEFAULT_RANGE]);
+    setRanges([]);
     setComment("");
     setSavedRanges([]);
     setCollapsedRanges({});
@@ -769,7 +881,7 @@ function App() {
     setActiveRangeFields({});
   }
 
-  function updateRange(index: number, field: keyof Range, value: string) {
+  function updateRange(index: number, field: TimeField, value: string) {
     setRanges((items) =>
       items.map((item, itemIndex) => {
         if (itemIndex !== index) return item;
@@ -785,8 +897,25 @@ function App() {
   }
 
   function removeRange(index: number) {
-    setRanges((items) => (items.length === 1 ? items : items.filter((_, itemIndex) => itemIndex !== index)));
-    setCollapsedRanges({});
+    const savedRange = savedRanges[index];
+    if (savedRange) {
+      setRanges((items) => items.map((item, itemIndex) => (itemIndex === index ? { ...item, deleted: true } : item)));
+      setCollapsedRanges((items) => ({ ...items, [index]: true }));
+      return;
+    }
+    setRanges((items) => {
+      const nextRanges = items.filter((_, itemIndex) => itemIndex !== index);
+      setCollapsedRanges(Object.fromEntries(nextRanges.map((range, itemIndex) => [itemIndex, isCompleteRange(range)])));
+      return nextRanges;
+    });
+    setSavedRanges((items) => items.filter((_, itemIndex) => itemIndex !== index));
+    setDialModes({});
+    setActiveRangeFields({});
+  }
+
+  function restoreRange(index: number) {
+    setRanges((items) => items.map((item, itemIndex) => (itemIndex === index ? { ...item, deleted: false } : item)));
+    setCollapsedRanges((items) => ({ ...items, [index]: true }));
   }
 
   function resetRange(index: number) {
@@ -804,7 +933,10 @@ function App() {
     const savedRange = savedRanges[index];
     setError("");
     if (!savedRange) {
-      resetRange(index);
+      if (ranges.length >= 1) {
+        removeRange(index);
+        return;
+      }
       return;
     }
     setRanges((items) => items.map((item, itemIndex) => (itemIndex === index ? savedRange : item)));
@@ -817,11 +949,11 @@ function App() {
     setActiveRangeFields((items) => ({ ...items, [index]: "start" }));
   }
 
-  function updateDialMode(index: number, field: keyof Range, mode: "hour" | "minute") {
+  function updateDialMode(index: number, field: TimeField, mode: "hour" | "minute") {
     setDialModes((items) => ({ ...items, [`${index}-${field}`]: mode }));
   }
 
-  function updateActiveRangeField(index: number, field: keyof Range) {
+  function updateActiveRangeField(index: number, field: TimeField) {
     setActiveRangeFields((items) => ({ ...items, [index]: field }));
   }
 
@@ -852,7 +984,17 @@ function App() {
     setSaving(true);
     setError("");
     try {
-      const usableRanges = canPlay ? ranges : [];
+      const usableRanges = canPlay ? ranges.filter(isActiveRange).map(({ start, end }) => ({ start, end })) : [];
+      if (canPlay && !usableRanges.length) {
+        if (!currentVote) {
+          setError("Agrega al menos un rango horario antes de avanzar.");
+          return;
+        }
+        const cleanSummary = await deleteAppVote(voterName);
+        setSummary(cleanSummary);
+        resetVotingFlow({ keepVoter: true });
+        return;
+      }
       if (canPlay && usableRanges.some((range) => !isCompleteRange(range))) {
         setError("Completa la hora de inicio y fin antes de avanzar.");
         return;
@@ -863,7 +1005,7 @@ function App() {
       }
       const savedSummary = await saveAppVote(voterName, canPlay, usableRanges, comment.trim());
       setSummary(savedSummary);
-      resetVotingFlow();
+      resetVotingFlow({ keepVoter: true });
     } catch (err) {
       setError(err instanceof Error ? err.message : "No se pudo guardar tu voto");
     } finally {
@@ -871,47 +1013,32 @@ function App() {
     }
   }
 
-  async function addResultRangeToMyVote(range: Range) {
+  function addResultRangeToMyVote(range: Range) {
     if (!voterName) return;
-    const baseRanges = currentVote?.canPlay ? currentVote.ranges : canPlay === true ? ranges.filter(isCompleteRange) : [];
+    const baseRanges = canPlay === true ? ranges.filter(isActiveCompleteRange) : currentVote?.canPlay ? ranges.filter(isActiveCompleteRange) : [];
     const exists = baseRanges.some((item) => item.start === range.start && item.end === range.end);
     if (exists) {
       setError("Ese rango ya esta en tu voto.");
       return;
     }
     const nextRanges = [...baseRanges, range];
-    setSaving(true);
     setError("");
-    try {
-      const savedSummary = await saveAppVote(voterName, true, nextRanges, currentVote?.comment ?? comment);
-      setSummary(savedSummary);
-      setCanPlay(true);
-      setRanges(nextRanges);
-      setSavedRanges(nextRanges);
-      setCollapsedRanges(Object.fromEntries(nextRanges.map((_, index) => [index, true])));
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "No se pudo agregar el rango.");
-    } finally {
-      setSaving(false);
-    }
+    setCanPlay(true);
+    setRanges(nextRanges);
+    setCollapsedRanges(Object.fromEntries(nextRanges.map((_, index) => [index, true])));
   }
 
-  async function removeResultRangeFromMyVote(index: number) {
+  function removeResultRangeFromMyVote(index: number) {
     if (!voterName || !currentVote?.canPlay) return;
-    const nextRanges = currentVote.ranges.filter((_, itemIndex) => itemIndex !== index);
-    setSaving(true);
+    const nextRanges = currentVote.ranges.map((range, itemIndex) =>
+      itemIndex === index ? { ...range, deleted: true } : range,
+    );
     setError("");
-    try {
-      const savedSummary = await saveAppVote(voterName, true, nextRanges, currentVote.comment);
-      setSummary(savedSummary);
-      setRanges(nextRanges.length ? nextRanges : [DEFAULT_RANGE]);
-      setSavedRanges(nextRanges);
-      setCollapsedRanges(Object.fromEntries(nextRanges.map((_, rangeIndex) => [rangeIndex, true])));
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "No se pudo borrar el rango.");
-    } finally {
-      setSaving(false);
-    }
+    setCanPlay(true);
+    setComment(currentVote.comment);
+    setRanges(nextRanges);
+    setSavedRanges(currentVote.ranges);
+    setCollapsedRanges(Object.fromEntries(nextRanges.map((_, rangeIndex) => [rangeIndex, true])));
   }
 
   function unlockAdmin() {
@@ -946,7 +1073,11 @@ function App() {
   }
 
   const dateLabel = summary ? formatDate(summary.date) : "Hoy";
-  const canSave = Boolean(voterName) && canPlay !== null;
+  const hasPendingDeletedSavedRanges = ranges.some((range, index) => range.deleted && savedRanges[index]);
+  const canSave =
+    Boolean(voterName) &&
+    canPlay !== null &&
+    (canPlay === false || ranges.some(isActiveCompleteRange) || (Boolean(currentVote) && hasPendingDeletedSavedRanges));
 
   return (
     <main className="app-shell">
@@ -1004,7 +1135,10 @@ function App() {
                   key={name}
                   onClick={() => requestVoterConfirmation(name)}
                 >
-                  <span>{name}</span>
+                  <span className="voter-button-content">
+                    <img className="voter-avatar" src={VOTER_AVATARS[name]} alt="" aria-hidden="true" />
+                    <span>{name}</span>
+                  </span>
                   {voterName === name ? <Check size={18} /> : null}
                 </button>
               ))}
@@ -1012,10 +1146,15 @@ function App() {
 
             {pendingVoterName ? (
               <div className="voter-confirm">
-                <p>Estas votando como {pendingVoterName}?</p>
-                <div>
-                  <button onClick={confirmVoter}>SI, SOY {pendingVoterName}</button>
-                  <button onClick={cancelVoterConfirmation}>CANCELAR</button>
+                <img className="voter-confirm-avatar" src={VOTER_AVATARS[pendingVoterName]} alt="" aria-hidden="true" />
+                <div className="voter-confirm-body">
+                  <p>
+                    Estas votando como <strong>{pendingVoterName}</strong>. Continuar?
+                  </p>
+                  <div>
+                    <button onClick={confirmVoter}>SI, SOY {pendingVoterName}</button>
+                    <button onClick={cancelVoterConfirmation}>CANCELAR</button>
+                  </div>
                 </div>
               </div>
             ) : null}
@@ -1053,10 +1192,11 @@ function App() {
                             index={index}
                             key={index}
                             range={range}
-                            canRemove={ranges.length > 1}
+                            canRemove
                             date={summary?.date}
                             onChange={updateRange}
                             onRemove={removeRange}
+                            onRestore={restoreRange}
                             onReset={resetRange}
                             dialModes={dialModes}
                             onDialModeChange={updateDialMode}
@@ -1066,11 +1206,15 @@ function App() {
                             onConfirm={confirmRange}
                             onEdit={editRange}
                             onCancel={cancelRangeEdit}
-                            canCancel={Boolean(savedRanges[index])}
                           />
                         ))}
-                        <button className="add-range-button" onClick={addRange} title="Agregar otro rango">
+                        <button
+                          className={`add-range-button ${ranges.length ? "" : "wide"}`}
+                          onClick={addRange}
+                          title="Agregar rango"
+                        >
                           <Plus size={17} />
+                          {ranges.length ? null : "AGREGAR RANGO"}
                         </button>
                       </div>
                     </div>
@@ -1112,20 +1256,36 @@ function App() {
                     <h2 className="panel-title">RESULTADOS DEL DIA</h2>
                     <span>{summary?.votes.length ?? 0} confirmaron</span>
                   </div>
+                  {summary?.suggestions?.length ? (
+                    <div className="range-suggestions">
+                      <h3>SUGERENCIAS</h3>
+                      <div>
+                        {summary.suggestions.map((suggestion) => (
+                          <button
+                            className="range-chip"
+                            key={`${suggestion.start}-${suggestion.end}`}
+                            onClick={() => addResultRangeToMyVote(suggestion)}
+                            title="Agregar este rango a mi voto"
+                          >
+                            <strong>
+                              {suggestion.start} hs a {suggestion.end} hs
+                            </strong>
+                            <Plus size={16} />
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+                  ) : null}
                   <div className="mt-4 grid gap-3">
-                    {sortedVotes.length ? (
-                      sortedVotes.map((vote) => (
-                        <VoteCard
-                          key={vote.voter}
-                          vote={vote}
-                          currentVoter={voterName}
-                          onAddRange={addResultRangeToMyVote}
-                          onRemoveOwnRange={removeResultRangeFromMyVote}
-                        />
-                      ))
-                    ) : (
-                      <p className="empty-state">Todavia no hay votos cargados para hoy.</p>
-                    )}
+                    {resultVotes.map((vote) => (
+                      <VoteCard
+                        key={vote.voter}
+                        vote={vote}
+                        currentVoter={voterName}
+                        onAddRange={addResultRangeToMyVote}
+                        onRemoveOwnRange={removeResultRangeFromMyVote}
+                      />
+                    ))}
                   </div>
                 </div>
 
@@ -1136,19 +1296,13 @@ function App() {
                   </div>
                   <div className="overlap-filter" aria-label="Filtrar coincidencias por jugador">
                     <span>Filtrar por:</span>
-                    <button
-                      className={overlapFilters.length < 2 ? "active" : ""}
-                      onClick={() => setOverlapFilters([])}
-                    >
-                      TODOS
-                    </button>
                     {VOTERS.map((name) => (
                       <button
                         className={overlapFilters.includes(name) ? "active" : ""}
                         key={name}
                         onClick={() => toggleOverlapFilter(name)}
                       >
-                        {name}
+                        <span>{name}</span>
                       </button>
                     ))}
                   </div>
@@ -1159,7 +1313,11 @@ function App() {
                           <strong>
                             {overlap.start} hs a {overlap.end} hs
                           </strong>
-                          <span>{overlap.voters.join(", ")}</span>
+                          <span className="avatar-stack" aria-label={overlap.voters.join(", ")}>
+                            {overlap.voters.map((voter) => (
+                              <PlayerAvatar key={voter} name={voter} size="mini" />
+                            ))}
+                          </span>
                         </div>
                       ))
                     ) : summary?.overlaps.length ? (
@@ -1379,6 +1537,7 @@ function RangeEditor({
   date,
   onChange,
   onRemove,
+  onRestore,
   onReset,
   dialModes,
   onDialModeChange,
@@ -1388,24 +1547,23 @@ function RangeEditor({
   onConfirm,
   onEdit,
   onCancel,
-  canCancel,
 }: {
   index: number;
   range: Range;
   canRemove: boolean;
   date?: string;
-  onChange: (index: number, field: keyof Range, value: string) => void;
+  onChange: (index: number, field: TimeField, value: string) => void;
   onRemove: (index: number) => void;
+  onRestore: (index: number) => void;
   onReset: (index: number) => void;
   dialModes: DialModes;
-  onDialModeChange: (index: number, field: keyof Range, mode: "hour" | "minute") => void;
-  activeField: keyof Range;
-  onActiveFieldChange: (index: number, field: keyof Range) => void;
+  onDialModeChange: (index: number, field: TimeField, mode: "hour" | "minute") => void;
+  activeField: TimeField;
+  onActiveFieldChange: (index: number, field: TimeField) => void;
   collapsed: boolean;
   onConfirm: (index: number) => void;
   onEdit: (index: number) => void;
   onCancel: (index: number) => void;
-  canCancel: boolean;
 }) {
   const startDate = date ? formatShortDate(date) : "hoy";
   const endDate = date ? formatShortDate(range.end === "24:00" ? addDays(date, 1) : date) : "hoy";
@@ -1413,18 +1571,26 @@ function RangeEditor({
 
   if (collapsed) {
     return (
-      <article className="range-card range-card-collapsed">
-        <button className="range-collapsed-summary" onClick={() => onEdit(index)}>
+      <article className={`range-card range-card-collapsed ${range.deleted ? "range-card-deleted" : ""}`}>
+        <button className="range-collapsed-summary" onClick={() => (range.deleted ? onRestore(index) : onEdit(index))}>
           <span>Rango {index + 1}</span>
-          <strong>{rangeSummary}</strong>
+          <strong>{range.deleted ? `${rangeSummary} - pendiente de eliminar` : rangeSummary}</strong>
         </button>
         <div className="range-actions">
-          <button className="icon-button small" onClick={() => onEdit(index)} title="Editar rango">
-            <Pencil size={15} />
-          </button>
-          <button className="icon-button small danger-button" onClick={() => onRemove(index)} disabled={!canRemove} title="Quitar rango">
-            <Trash2 size={16} />
-          </button>
+          {range.deleted ? (
+            <button className="icon-button small" onClick={() => onRestore(index)} title="Recuperar rango">
+              <RotateCcw size={15} />
+            </button>
+          ) : (
+            <>
+              <button className="icon-button small" onClick={() => onEdit(index)} title="Editar rango">
+                <Pencil size={15} />
+              </button>
+              <button className="icon-button small danger-button" onClick={() => onRemove(index)} disabled={!canRemove} title="Quitar rango">
+                <Trash2 size={16} />
+              </button>
+            </>
+          )}
         </div>
       </article>
     );
@@ -1465,13 +1631,11 @@ function RangeEditor({
         onDialModeChange={(nextMode) => onDialModeChange(index, activeField, nextMode)}
         onChange={(value) => onChange(index, activeField, value)}
       />
-      <div className={`range-edit-actions ${canCancel ? "with-cancel" : ""}`}>
-        {canCancel ? (
-          <button className="cancel-range-button" onClick={() => onCancel(index)}>
-            <X size={17} />
-            CANCELAR
-          </button>
-        ) : null}
+      <div className="range-edit-actions with-cancel">
+        <button className="cancel-range-button" onClick={() => onCancel(index)}>
+          <X size={17} />
+          CANCELAR
+        </button>
         <button className="confirm-range-button" onClick={() => onConfirm(index)}>
           <Check size={17} />
           CONFIRMAR RANGO
@@ -1621,6 +1785,18 @@ function ClockOption({
   );
 }
 
+function PlayerAvatar({ name, size = "small" }: { name: string; size?: "micro" | "mini" | "small" }) {
+  return (
+    <img
+      className={`player-avatar ${size}`}
+      src={VOTER_AVATARS[name] ?? VOTER_AVATARS.MISHA}
+      alt=""
+      aria-hidden="true"
+      title={name}
+    />
+  );
+}
+
 function VoteCard({
   vote,
   currentVoter,
@@ -1638,10 +1814,15 @@ function VoteCard({
   return (
     <article className="vote-card">
       <div className="vote-card-header">
-        <h3>{vote.voter}</h3>
-        <p>Actualizado {formatUpdatedAt(vote.updatedAt)}</p>
+        <div className="vote-player">
+          <PlayerAvatar name={vote.voter} size="small" />
+          <h3>{vote.voter}</h3>
+        </div>
+        {vote.updatedAt ? <p>Actualizado {formatUpdatedAt(vote.updatedAt)}</p> : null}
       </div>
-      {vote.canPlay ? (
+      {!vote.updatedAt ? (
+        <span className="no-vote">No tiene votos hoy</span>
+      ) : vote.canPlay && vote.ranges.length ? (
         <div className="range-list">
           {vote.ranges.map((range, index) => (
             <span className="range-chip" key={`${range.start}-${range.end}-${index}`}>
@@ -1661,6 +1842,8 @@ function VoteCard({
             </span>
           ))}
         </div>
+      ) : vote.canPlay ? (
+        <span className="no-vote">No tiene votos hoy</span>
       ) : (
         <span className="cannot-play">No puede jugar hoy</span>
       )}
