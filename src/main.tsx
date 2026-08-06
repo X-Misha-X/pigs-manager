@@ -104,6 +104,8 @@ const OUTER_HOURS = ["12", "01", "02", "03", "04", "05", "06", "07", "08", "09",
 const INNER_HOURS = ["00", "13", "14", "15", "16", "17", "18", "19", "20", "21", "22", "23"];
 const MIN_RANGE_MINUTES = 5;
 const PLACEHOLDER_TIME = "HH:MM";
+const OVERNIGHT_TIME = "TRASNOCHE";
+const OVERNIGHT_END_MINUTES = 24 * 60;
 const DEFAULT_RANGE = { start: PLACEHOLDER_TIME, end: PLACEHOLDER_TIME };
 const TIME_PATTERN = /^(?:(?:[01]\d|2[0-3]):(?:00|05|10|15|20|25|30|35|40|45|50|55)|24:00)$/;
 const HOUR_PATTERN = /^(?:[01]\d|2[0-4])$/;
@@ -126,6 +128,10 @@ function isSelectedTime(value: string) {
   return TIME_PATTERN.test(value);
 }
 
+function isOvernightTime(value: string) {
+  return value === OVERNIGHT_TIME;
+}
+
 function splitTime(value: string) {
   const [hour = "HH", minute = "MM"] = value.split(":");
   return { hour, minute };
@@ -140,7 +146,7 @@ function isSelectedMinute(value: string) {
 }
 
 function isCompleteRange(range: Range) {
-  return isSelectedTime(range.start) && isSelectedTime(range.end);
+  return isSelectedTime(range.start) && (isSelectedTime(range.end) || isOvernightTime(range.end));
 }
 
 function isActiveRange(range: Range) {
@@ -152,13 +158,26 @@ function isActiveCompleteRange(range: Range) {
 }
 
 function isValidRange(range: Range) {
-  return isActiveCompleteRange(range) && timeToMinutes(range.end) - timeToMinutes(range.start) >= MIN_RANGE_MINUTES;
+  return isActiveCompleteRange(range) && rangeEndToMinutes(range) - timeToMinutes(range.start) >= MIN_RANGE_MINUTES;
 }
 
 function minutesToTime(value: number) {
   const hour = Math.floor(value / 60);
   const minute = value % 60;
   return `${String(hour).padStart(2, "0")}:${String(minute).padStart(2, "0")}`;
+}
+
+function rangeEndToMinutes(range: Pick<Range, "end">) {
+  return isOvernightTime(range.end) ? OVERNIGHT_END_MINUTES : timeToMinutes(range.end);
+}
+
+function minutesToRangeEnd(value: number) {
+  return value >= OVERNIGHT_END_MINUTES ? OVERNIGHT_TIME : minutesToTime(value);
+}
+
+function formatRange(range: Pick<Range, "start" | "end">) {
+  const end = isOvernightTime(range.end) ? OVERNIGHT_TIME : `${range.end} hs`;
+  return `${range.start} hs a ${end}`;
 }
 
 function normalizeRange(range: Range): Range {
@@ -268,11 +287,11 @@ function friendlyGameError(error: unknown) {
 }
 
 function toOverlap(start: number, end: number, voters: string[]) {
-  return { start: minutesToTime(start), end: minutesToTime(end), voters };
+  return { start: minutesToTime(start), end: minutesToRangeEnd(end), voters };
 }
 
 function overlapDuration(overlap: Summary["overlaps"][number]) {
-  return timeToMinutes(overlap.end) - timeToMinutes(overlap.start);
+  return rangeEndToMinutes(overlap) - timeToMinutes(overlap.start);
 }
 
 function sortOverlaps(overlaps: Summary["overlaps"]) {
@@ -288,7 +307,7 @@ function sortOverlaps(overlaps: Summary["overlaps"]) {
 }
 
 function rangeDuration(range: Range) {
-  return timeToMinutes(range.end) - timeToMinutes(range.start);
+  return rangeEndToMinutes(range) - timeToMinutes(range.start);
 }
 
 function combinations<T>(items: T[], size: number): T[][] {
@@ -305,7 +324,7 @@ function intersectRanges(existing: Array<[number, number]>, ranges: Range[]) {
   existing.forEach(([currentStart, currentEnd]) => {
     ranges.forEach((range) => {
       const start = Math.max(currentStart, timeToMinutes(range.start));
-      const end = Math.min(currentEnd, timeToMinutes(range.end));
+      const end = Math.min(currentEnd, rangeEndToMinutes(range));
       if (end > start) next.push([start, end]);
     });
   });
@@ -328,14 +347,14 @@ function mergeIntervals(intervals: Array<[number, number]>) {
 
 function calculateOverlaps(votes: Vote[]): Summary["overlaps"] {
   const playableVotes = votes.filter((vote) => vote.canPlay && vote.ranges.length);
-  const overlaps: Summary["overlaps"] = [];
+  const overlapsByTime = new Map<string, Set<string>>();
 
   for (let size = 2; size <= playableVotes.length; size += 1) {
     combinations(playableVotes, size).forEach((group) => {
       const [firstVote, ...otherVotes] = group;
       const initialIntervals = firstVote.ranges.map((range) => [
         timeToMinutes(range.start),
-        timeToMinutes(range.end),
+        rangeEndToMinutes(range),
       ]) as Array<[number, number]>;
       const commonIntervals = otherVotes.reduce(
         (intervals, vote) => intersectRanges(intervals, vote.ranges),
@@ -343,10 +362,20 @@ function calculateOverlaps(votes: Vote[]): Summary["overlaps"] {
       );
       const voters = group.map((vote) => vote.voter).sort();
       mergeIntervals(commonIntervals).forEach(([start, end]) => {
-        overlaps.push(toOverlap(start, end, voters));
+        const key = `${start}-${end}`;
+        const existingVoters = overlapsByTime.get(key) ?? new Set<string>();
+        voters.forEach((voter) => existingVoters.add(voter));
+        overlapsByTime.set(key, existingVoters);
       });
     });
   }
+
+  const overlaps = [...overlapsByTime.entries()]
+    .map(([key, voters]) => {
+      const [start, end] = key.split("-").map(Number);
+      return toOverlap(start, end, [...voters].sort());
+    })
+    .filter((overlap) => overlap.voters.length >= 2);
 
   return sortOverlaps(overlaps);
 }
@@ -891,6 +920,12 @@ function App() {
     setCollapsedRanges((items) => ({ ...items, [index]: false }));
   }
 
+  function toggleOvernightRange(index: number, enabled: boolean) {
+    updateRange(index, "end", enabled ? OVERNIGHT_TIME : PLACEHOLDER_TIME);
+    setActiveRangeFields((items) => ({ ...items, [index]: "end" }));
+    setDialModes((items) => ({ ...items, [`${index}-end`]: "hour" }));
+  }
+
   function addRange() {
     setRanges((items) => [...items, DEFAULT_RANGE]);
     setCollapsedRanges((items) => ({ ...items, [ranges.length]: false }));
@@ -1195,6 +1230,7 @@ function App() {
                             canRemove
                             date={summary?.date}
                             onChange={updateRange}
+                            onToggleOvernight={toggleOvernightRange}
                             onRemove={removeRange}
                             onRestore={restoreRange}
                             onReset={resetRange}
@@ -1267,9 +1303,7 @@ function App() {
                             onClick={() => addResultRangeToMyVote(suggestion)}
                             title="Agregar este rango a mi voto"
                           >
-                            <strong>
-                              {suggestion.start} hs a {suggestion.end} hs
-                            </strong>
+                            <strong>{formatRange(suggestion)}</strong>
                             <Plus size={16} />
                           </button>
                         ))}
@@ -1310,9 +1344,7 @@ function App() {
                     {filteredOverlaps.length ? (
                       filteredOverlaps.map((overlap) => (
                         <div className="overlap-row" key={`${overlap.start}-${overlap.end}-${overlap.voters.join("-")}`}>
-                          <strong>
-                            {overlap.start} hs a {overlap.end} hs
-                          </strong>
+                            <strong>{formatRange(overlap)}</strong>
                           <span className="avatar-stack" aria-label={overlap.voters.join(", ")}>
                             {overlap.voters.map((voter) => (
                               <PlayerAvatar key={voter} name={voter} size="mini" />
@@ -1536,6 +1568,7 @@ function RangeEditor({
   canRemove,
   date,
   onChange,
+  onToggleOvernight,
   onRemove,
   onRestore,
   onReset,
@@ -1553,6 +1586,7 @@ function RangeEditor({
   canRemove: boolean;
   date?: string;
   onChange: (index: number, field: TimeField, value: string) => void;
+  onToggleOvernight: (index: number, enabled: boolean) => void;
   onRemove: (index: number) => void;
   onRestore: (index: number) => void;
   onReset: (index: number) => void;
@@ -1566,8 +1600,8 @@ function RangeEditor({
   onCancel: (index: number) => void;
 }) {
   const startDate = date ? formatShortDate(date) : "hoy";
-  const endDate = date ? formatShortDate(range.end === "24:00" ? addDays(date, 1) : date) : "hoy";
-  const rangeSummary = isCompleteRange(range) ? `${range.start} hs a ${range.end} hs` : "Sin confirmar";
+  const endDate = date ? formatShortDate(range.end === "24:00" || isOvernightTime(range.end) ? addDays(date, 1) : date) : "hoy";
+  const rangeSummary = isCompleteRange(range) ? formatRange(range) : "Sin confirmar";
 
   if (collapsed) {
     return (
@@ -1625,12 +1659,29 @@ function RangeEditor({
           <strong>{range.end}</strong>
         </button>
       </div>
-      <TimePicker
-        value={range[activeField]}
-        dialMode={dialModes[`${index}-${activeField}`] ?? "hour"}
-        onDialModeChange={(nextMode) => onDialModeChange(index, activeField, nextMode)}
-        onChange={(value) => onChange(index, activeField, value)}
-      />
+      {activeField === "end" ? (
+        <label className={`overnight-toggle ${isOvernightTime(range.end) ? "active" : ""}`}>
+          <input
+            type="checkbox"
+            checked={isOvernightTime(range.end)}
+            onChange={(event) => onToggleOvernight(index, event.target.checked)}
+          />
+          <span>TRASNOCHE</span>
+        </label>
+      ) : null}
+      {activeField === "end" && isOvernightTime(range.end) ? (
+        <div className="overnight-preview">
+          <strong>TRASNOCHE</strong>
+          <span>Sin hora final por ahora.</span>
+        </div>
+      ) : (
+        <TimePicker
+          value={range[activeField]}
+          dialMode={dialModes[`${index}-${activeField}`] ?? "hour"}
+          onDialModeChange={(nextMode) => onDialModeChange(index, activeField, nextMode)}
+          onChange={(value) => onChange(index, activeField, value)}
+        />
+      )}
       <div className="range-edit-actions with-cancel">
         <button className="cancel-range-button" onClick={() => onCancel(index)}>
           <X size={17} />
@@ -1711,7 +1762,7 @@ function TimePicker({
                   selected={selectedHour === hour}
                   index={index}
                   total={OUTER_HOURS.length}
-                  radius={31.5}
+                  radius={36.8}
                   onClick={() => selectHour(hour)}
                 />
               ))}
@@ -1723,7 +1774,7 @@ function TimePicker({
                   selected={selectedHour === hour}
                   index={index}
                   total={INNER_HOURS.length}
-                  radius={19.5}
+                  radius={24.5}
                   variant="inner"
                   onClick={() => selectHour(hour)}
                 />
@@ -1739,7 +1790,7 @@ function TimePicker({
                 disabled={selectedHour === "24" && minute !== "00"}
                 index={index}
                 total={MINUTES.length}
-                radius={31.5}
+                radius={36.8}
                 onClick={() => selectMinute(minute)}
               />
             ))}
@@ -1826,9 +1877,7 @@ function VoteCard({
         <div className="range-list">
           {vote.ranges.map((range, index) => (
             <span className="range-chip" key={`${range.start}-${range.end}-${index}`}>
-              <strong>
-                {range.start} hs a {range.end} hs
-              </strong>
+              <strong>{formatRange(range)}</strong>
               {canCopyRange ? (
                 <button onClick={() => onAddRange(range)} title="Agregar este rango a mi voto">
                   <Plus size={14} />
