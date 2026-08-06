@@ -825,9 +825,50 @@ button {
   color: rgba(164, 236, 212, 0.7);
 }
 
+.overnight-toggle {
+  @apply mb-3 flex items-center justify-between gap-3 rounded-md border px-4 py-3 text-sm font-semibold transition;
+  border-color: rgba(164, 236, 212, 0.2);
+  background: rgba(18, 18, 33, 0.34);
+  color: rgba(247, 255, 252, 0.68);
+}
+
+.overnight-toggle input {
+  @apply h-4 w-4;
+  accent-color: var(--cyan);
+}
+
+.overnight-toggle span {
+  @apply uppercase;
+  color: var(--mint);
+}
+
+.overnight-toggle.active {
+  border-color: rgba(56, 200, 204, 0.72);
+  background: rgba(56, 200, 204, 0.14);
+  box-shadow: 0 0 18px rgba(56, 200, 204, 0.12);
+}
+
+.overnight-preview {
+  @apply flex min-h-52 flex-col items-center justify-center gap-3 rounded-md border px-4 py-8 text-center;
+  border-color: rgba(56, 200, 204, 0.24);
+  background:
+    radial-gradient(circle at center, rgba(56, 200, 204, 0.16), transparent 58%),
+    rgba(18, 18, 33, 0.36);
+}
+
+.overnight-preview strong {
+  @apply text-2xl font-semibold;
+  color: var(--mint);
+}
+
+.overnight-preview span {
+  @apply text-xs font-semibold;
+  color: rgba(247, 255, 252, 0.62);
+}
+
 .clock-face {
   @apply relative mx-auto rounded-full border;
-  width: min(100%, 17.5rem);
+  width: min(100%, 20.5rem);
   aspect-ratio: 1;
   isolation: isolate;
   border-color: rgba(164, 236, 212, 0.22);
@@ -871,37 +912,37 @@ button {
 .clock-marker {
   @apply pointer-events-none absolute left-1/2 top-1/2 block origin-center;
   z-index: 1;
-  width: 5px;
-  height: 24px;
-  margin-left: -2.5px;
-  margin-top: -12px;
+  width: 2px;
+  height: 14px;
+  margin-left: -1px;
+  margin-top: -7px;
   border-radius: 999px;
   background: rgba(247, 255, 252, 0.92);
   box-shadow: 0 0 8px rgba(164, 236, 212, 0.34);
-  transform: rotate(var(--angle)) translateY(-7.35rem);
+  transform: rotate(var(--angle)) translateY(-9.6rem);
 }
 
 .clock-marker.major {
-  height: 24px;
+  height: 14px;
 }
 
 .clock-face.hour .clock-marker.major,
 .clock-face.minute .clock-marker.major {
-  height: 20px;
-  width: 4px;
-  margin-left: -2px;
-  margin-top: -10px;
-  transform: rotate(var(--angle)) translateY(-7.25rem);
+  height: 14px;
+  width: 3px;
+  margin-left: -1.5px;
+  margin-top: -7px;
+  transform: rotate(var(--angle)) translateY(-9.5rem);
 }
 
 .clock-marker.minor {
-  height: 9px;
+  height: 6px;
   width: 2px;
   margin-left: -1px;
-  margin-top: -4.5px;
+  margin-top: -3px;
   background: rgba(247, 255, 252, 0.48);
   box-shadow: none;
-  transform: rotate(var(--angle)) translateY(-7.1rem);
+  transform: rotate(var(--angle)) translateY(-9.28rem);
 }
 
 .clock-hand {
@@ -935,14 +976,14 @@ button {
 }
 
 .clock-option {
-  @apply absolute z-20 flex h-8 w-8 -translate-x-1/2 -translate-y-1/2 items-center justify-center rounded-full text-xs font-bold tabular-nums transition disabled:cursor-not-allowed disabled:opacity-25;
+  @apply absolute z-20 flex h-9 w-9 -translate-x-1/2 -translate-y-1/2 items-center justify-center rounded-full text-sm font-bold tabular-nums transition disabled:cursor-not-allowed disabled:opacity-25;
   background: rgba(255, 255, 255, 0.1);
   color: rgba(247, 255, 252, 0.82);
   box-shadow: 0 0 0 1px rgba(255, 255, 255, 0.035) inset;
 }
 
 .clock-option.inner {
-  @apply h-6 w-6 text-[10px];
+  @apply h-8 w-8 text-xs;
   background: rgba(56, 200, 204, 0.16);
   color: rgba(164, 236, 212, 0.86);
   box-shadow: 0 0 10px rgba(56, 200, 204, 0.08);
