@@ -127,7 +127,17 @@ function voteFromRow(row) {
   };
 }
 
-function buildDiscordEmbed(date, votes, overlaps) {
+function buildTopSignature(overlaps) {
+  const topMatches = overlaps.slice(0, 3).map((overlap) => ({
+    start: overlap.start,
+    end: overlap.end,
+    voters: overlap.voters,
+  }));
+  const rawSignature = topMatches.length ? JSON.stringify(topMatches) : "no-matches";
+  return Buffer.from(rawSignature).toString("base64url");
+}
+
+function buildDiscordEmbed(date, votes, overlaps, title = "Resultados del día") {
   const overlapLines = overlaps.length
     ? overlaps
         .slice(0, 3)
@@ -141,7 +151,7 @@ function buildDiscordEmbed(date, votes, overlaps) {
     author: {
       name: "Pigs Manager",
     },
-    title: "Resultados del día",
+    title,
     description: `${DISCORD_EMOJI.calendar} ${formatDate(date)}\n\n\u200b`,
     color: 0xff4fa3,
     fields: [
@@ -185,9 +195,7 @@ async function supabaseRequest(path, options = {}) {
   return body.trim() ? JSON.parse(body) : undefined;
 }
 
-async function markNotificationPending(date) {
-  const eventKey = `today-results:${date}`;
-
+async function markNotificationEvent(eventKey, date) {
   try {
     await supabaseRequest("/notification_events", {
       method: "POST",
@@ -206,15 +214,36 @@ async function markNotificationPending(date) {
   return true;
 }
 
+async function markNotificationPending(date) {
+  return markNotificationEvent(`today-results:${date}`, date);
+}
+
+async function markTopNotification(date, topSignature) {
+  return markNotificationEvent(`today-results-top:${date}:${Date.now()}:${topSignature}`, date);
+}
+
 async function getNotificationStatus(date) {
   const eventKey = encodeURIComponent(`today-results:${date}`);
   const rows = await supabaseRequest(`/notification_events?event_key=eq.${eventKey}&select=event_key,created_at&limit=1`);
   return rows.length > 0 ? rows[0] : null;
 }
 
+async function getLatestTopNotification(date) {
+  const eventPrefix = encodeURIComponent(`today-results-top:${date}:*`);
+  const rows = await supabaseRequest(
+    `/notification_events?event_key=like.${eventPrefix}&select=event_key,created_at&order=created_at.desc&limit=1`,
+  );
+  return rows.length > 0 ? rows[0] : null;
+}
+
 async function deleteNotificationMark(date) {
   const eventKey = encodeURIComponent(`today-results:${date}`);
   await supabaseRequest(`/notification_events?event_key=eq.${eventKey}`, {
+    method: "DELETE",
+    headers: { Prefer: "return=minimal" },
+  });
+  const topEventPrefix = encodeURIComponent(`today-results-top:${date}:*`);
+  await supabaseRequest(`/notification_events?event_key=like.${topEventPrefix}`, {
     method: "DELETE",
     headers: { Prefer: "return=minimal" },
   });
@@ -310,10 +339,20 @@ export default async function handler(request, response) {
       return;
     }
 
+    const overlaps = calculateOverlaps(votes);
+    const topSignature = buildTopSignature(overlaps);
     const previousNotification = await getNotificationStatus(date);
+    let notificationContent = "Ya votaron todos.";
+    let embedTitle = "Resultados del día";
+
     if (previousNotification && !force) {
-      response.status(200).json({ ok: true, skipped: true, reason: "Los resultados ya fueron enviados." });
-      return;
+      const previousTopNotification = await getLatestTopNotification(date);
+      if (previousTopNotification?.event_key?.endsWith(`:${topSignature}`)) {
+        response.status(200).json({ ok: true, skipped: true, reason: "El TOP no cambio desde el ultimo aviso." });
+        return;
+      }
+      notificationContent = "Resultados actualizados.";
+      embedTitle = "Resultados actualizados";
     }
     if (force) {
       if (!adminPin || body.pin !== adminPin) {
@@ -323,14 +362,13 @@ export default async function handler(request, response) {
       await deleteNotificationMark(date);
     }
 
-    const overlaps = calculateOverlaps(votes);
     const discordResponse = await fetch(discordWebhookUrl, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
         username: "Pigs Manager",
-        content: "Ya votaron todos.",
-        embeds: [buildDiscordEmbed(date, votes, overlaps)],
+        content: notificationContent,
+        embeds: [buildDiscordEmbed(date, votes, overlaps, embedTitle)],
       }),
     });
 
@@ -340,7 +378,8 @@ export default async function handler(request, response) {
     }
 
     await markNotificationPending(date);
-    response.status(200).json({ ok: true, notified: true });
+    await markTopNotification(date, topSignature);
+    response.status(200).json({ ok: true, notified: true, updated: Boolean(previousNotification && !force) });
   } catch (error) {
     response.status(500).json({ error: error instanceof Error ? error.message : "No se pudo enviar la notificacion." });
   }

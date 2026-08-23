@@ -66,6 +66,11 @@ async function deleteNotificationMark(date) {
     method: "DELETE",
     headers: { Prefer: "return=minimal" },
   });
+  const topEventPrefix = encodeURIComponent(`today-results-top:${date}:*`);
+  await supabaseRequest(`/notification_events?event_key=like.${topEventPrefix}`, {
+    method: "DELETE",
+    headers: { Prefer: "return=minimal" },
+  });
 }
 
 export default async function handler(request, response) {

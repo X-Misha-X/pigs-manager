@@ -551,6 +551,7 @@ async function saveAppVote(voter: string, canPlay: boolean, ranges: Range[], com
 type NotificationResult = {
   ok?: boolean;
   notified?: boolean;
+  updated?: boolean;
   skipped?: boolean;
   reason?: string;
   error?: string;
@@ -1472,7 +1473,9 @@ function App() {
       const savedSummary = await saveAppVote(voterName, canPlay, usableRanges, comment.trim());
       setSummary(savedSummary);
       const notificationResult = await notifyResultsIfComplete(savedSummary);
-      if (notificationResult?.notified) {
+      if (notificationResult?.notified && notificationResult.updated) {
+        setNotificationNotice("Voto guardado y actualizacion enviada a Discord.");
+      } else if (notificationResult?.notified) {
         setNotificationNotice("Voto guardado y resultados enviados a Discord.");
       } else if (notificationResult?.skipped) {
         setNotificationNotice(`Voto guardado. Discord no envio aviso: ${notificationResult.reason}`);
