@@ -130,7 +130,7 @@ function voteFromRow(row) {
 function buildDiscordEmbed(date, votes, overlaps) {
   const overlapLines = overlaps.length
     ? overlaps
-        .slice(0, 5)
+        .slice(0, 3)
         .map((overlap, index) => {
           const rank = DISCORD_EMOJI.medals[index] ?? DISCORD_EMOJI.star;
           return `${rank} **${formatRange(overlap)}**\n${overlap.voters.join(", ")}`;
@@ -180,7 +180,9 @@ async function supabaseRequest(path, options = {}) {
   }
 
   if (response.status === 204) return undefined;
-  return response.json();
+
+  const body = await response.text();
+  return body.trim() ? JSON.parse(body) : undefined;
 }
 
 async function markNotificationPending(date) {

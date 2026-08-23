@@ -192,7 +192,7 @@ function formatRange(range: Pick<Range, "start" | "end">) {
 function buildResultsMessage(summary: Summary) {
   const topMatches = summary.overlaps.length
     ? summary.overlaps
-        .slice(0, 5)
+        .slice(0, 3)
         .map((overlap, index) => {
           const rank = SHARE_EMOJI.medals[index] ?? SHARE_EMOJI.star;
           return `${rank} *${formatRange(overlap)}*\n${overlap.voters.join(", ")}`;
@@ -202,9 +202,11 @@ function buildResultsMessage(summary: Summary) {
 
   return [
     `${SHARE_EMOJI.pig} *Pigs Manager*`,
+    "*Resultados del día*",
     `${SHARE_EMOJI.calendar} ${formatDate(summary.date)}`,
     "",
     `${SHARE_EMOJI.trophy} *TOP MATCHES*`,
+    "",
     topMatches,
   ].join("\n");
 }

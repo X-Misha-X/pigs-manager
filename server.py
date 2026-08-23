@@ -212,7 +212,7 @@ def build_discord_embed(date: str, votes: list[dict[str, Any]], overlaps: list[d
         [
             f'{(DISCORD_EMOJI["medals"][index] if index < len(DISCORD_EMOJI["medals"]) else DISCORD_EMOJI["star"])} '
             f'**{overlap["start"]} hs a {overlap["end"]} hs**\n{", ".join(overlap["voters"])}'
-            for index, overlap in enumerate(overlaps[:5])
+            for index, overlap in enumerate(overlaps[:3])
         ]
         if overlaps
         else ["Sin coincidencias para todos por ahora."]
