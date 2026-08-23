@@ -211,6 +211,9 @@ async function deleteNotificationMark(date) {
 
 async function readJsonBody(request) {
   if (request.body && typeof request.body === "object") return request.body;
+  if (typeof request.body === "string") {
+    return request.body.trim() ? JSON.parse(request.body) : {};
+  }
 
   const chunks = [];
   for await (const chunk of request) {
@@ -218,7 +221,8 @@ async function readJsonBody(request) {
   }
 
   if (!chunks.length) return {};
-  return JSON.parse(Buffer.concat(chunks).toString("utf8"));
+  const rawBody = Buffer.concat(chunks).toString("utf8");
+  return rawBody.trim() ? JSON.parse(rawBody) : {};
 }
 
 export default async function handler(request, response) {
