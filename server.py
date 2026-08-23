@@ -222,7 +222,7 @@ def build_discord_embed(date: str, votes: list[dict[str, Any]], overlaps: list[d
     return {
         "author": {"name": "Pigs Manager"},
         "title": "Resultados del día",
-        "description": f'{DISCORD_EMOJI["calendar"]} {date}',
+        "description": f'{DISCORD_EMOJI["calendar"]} {date}\n\n\u200b',
         "color": 0xFF4FA3,
         "fields": [
             {

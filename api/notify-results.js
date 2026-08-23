@@ -142,7 +142,7 @@ function buildDiscordEmbed(date, votes, overlaps) {
       name: "Pigs Manager",
     },
     title: "Resultados del día",
-    description: `${DISCORD_EMOJI.calendar} ${formatDate(date)}`,
+    description: `${DISCORD_EMOJI.calendar} ${formatDate(date)}\n\n\u200b`,
     color: 0xff4fa3,
     fields: [
       {

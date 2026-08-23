@@ -184,24 +184,23 @@ function formatRange(range: Pick<Range, "start" | "end">) {
 }
 
 function buildResultsMessage(summary: Summary) {
-  const overlapLines = summary.overlaps.length
+  const topMatches = summary.overlaps.length
     ? summary.overlaps
         .slice(0, 5)
         .map((overlap, index) => {
           return `#${index + 1} *${formatRange(overlap)}*\n${overlap.voters.join(", ")}`;
         })
-    : ["Sin coincidencias por ahora."];
+        .join("\n\n")
+    : "Sin coincidencias por ahora.";
 
   return [
     "*Pigs Manager*",
     SHARE_DIVIDER,
     formatDate(summary.date),
     "",
-    `*${summary.votes.length}/${VOTERS.length} confirmaron*`,
-    "",
     "*TOP MATCHES*",
     SHARE_DIVIDER,
-    ...overlapLines,
+    topMatches,
   ].join("\n");
 }
 
