@@ -45,9 +45,10 @@ La app puede avisar automaticamente en Discord cuando ya votaron todos los integ
 ```bash
 DISCORD_WEBHOOK_URL=https://discord.com/api/webhooks/...
 SUPABASE_SERVICE_ROLE_KEY=tu-service-role-key
+NOTIFICATION_ADMIN_PIN=tu-pin-admin
 ```
 
-`DISCORD_WEBHOOK_URL` y `SUPABASE_SERVICE_ROLE_KEY` son secretos del servidor: no deben tener prefijo `VITE_`.
+`DISCORD_WEBHOOK_URL`, `SUPABASE_SERVICE_ROLE_KEY` y `NOTIFICATION_ADMIN_PIN` son secretos del servidor: no deben tener prefijo `VITE_`.
 
 3. Ejecutar en Supabase el contenido actualizado de `supabase/schema.sql`.
 

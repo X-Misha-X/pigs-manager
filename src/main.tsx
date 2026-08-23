@@ -661,31 +661,21 @@ async function toggleAppGameVote(game: GameOption, voter: string): Promise<GameO
 }
 
 async function deleteTodayVotes(pin: string): Promise<Summary> {
-  if (!ADMIN_PIN || pin !== ADMIN_PIN) {
-    throw new Error("PIN incorrecto.");
-  }
-
-  const beforeDelete = await loadAppSummary();
-
   if (!USE_SUPABASE) {
+    if (!ADMIN_PIN || pin !== ADMIN_PIN) {
+      throw new Error("PIN incorrecto.");
+    }
     return request<Summary>("/votes/today", {
       method: "DELETE",
       body: JSON.stringify({ pin }),
     });
   }
 
-  const date = todayBuenosAires();
-  await supabaseRequest<undefined>(`/votes?date=eq.${date}`, {
+  await request<{ ok: boolean }>("/votes-today", {
     method: "DELETE",
-    headers: {
-      Prefer: "return=minimal",
-    },
+    body: JSON.stringify({ pin }),
   });
-  const afterDelete = await loadAppSummary();
-  if (beforeDelete.votes.length > 0 && afterDelete.votes.length > 0) {
-    throw new Error("Supabase no borro los votos. Revisa que exista la policy DELETE en la tabla votes.");
-  }
-  return afterDelete;
+  return loadAppSummary();
 }
 
 async function request<T>(path: string, options?: RequestInit): Promise<T> {
@@ -1143,11 +1133,7 @@ function App() {
 
   function unlockAdmin() {
     setAdminError("");
-    if (!ADMIN_PIN) {
-      setAdminError("Falta configurar el PIN admin.");
-      return;
-    }
-    if (adminPin !== ADMIN_PIN) {
+    if (!USE_SUPABASE && (!ADMIN_PIN || adminPin !== ADMIN_PIN)) {
       setAdminError("PIN incorrecto.");
       return;
     }
