@@ -44,7 +44,6 @@ function formatRange(range) {
 
 const DISCORD_EMOJI = {
   calendar: String.fromCodePoint(0x1f4c5),
-  check: String.fromCodePoint(0x2705),
   trophy: String.fromCodePoint(0x1f3c6),
   medals: [String.fromCodePoint(0x1f947), String.fromCodePoint(0x1f948), String.fromCodePoint(0x1f949)],
   star: String.fromCodePoint(0x2b50),
@@ -143,16 +142,12 @@ function buildDiscordEmbed(date, votes, overlaps) {
       name: "Pigs Manager",
     },
     title: "Resultados del día",
-    description: [
-      `${DISCORD_EMOJI.calendar} ${formatDate(date)}`,
-      "",
-      `${DISCORD_EMOJI.check} **${votes.length}/${VOTERS.length} confirmaron**`,
-    ].join("\n"),
+    description: `${DISCORD_EMOJI.calendar} ${formatDate(date)}`,
     color: 0xff4fa3,
     fields: [
       {
         name: `${DISCORD_EMOJI.trophy} TOP MATCHES`,
-        value: overlapLines.join("\n\n"),
+        value: `\u200b\n${overlapLines.join("\n\n")}`,
         inline: false,
       },
     ],

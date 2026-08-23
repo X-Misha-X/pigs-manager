@@ -23,7 +23,6 @@ DISCORD_WEBHOOK_URL = os.environ.get("DISCORD_WEBHOOK_URL", "")
 VOTERS = ["MISHA", "LEKU", "SEPIA", "ICHITBO"]
 DISCORD_EMOJI = {
     "calendar": chr(0x1F4C5),
-    "check": chr(0x2705),
     "trophy": chr(0x1F3C6),
     "medals": [chr(0x1F947), chr(0x1F948), chr(0x1F949)],
     "star": chr(0x2B50),
@@ -218,14 +217,19 @@ def build_discord_embed(date: str, votes: list[dict[str, Any]], overlaps: list[d
         if overlaps
         else ["Sin coincidencias para todos por ahora."]
     )
+    overlap_value = "\u200b\n" + "\n\n".join(overlap_lines)
 
     return {
         "author": {"name": "Pigs Manager"},
         "title": "Resultados del día",
-        "description": f'{DISCORD_EMOJI["calendar"]} {date}\n\n{DISCORD_EMOJI["check"]} **{len(votes)}/{len(VOTERS)} confirmaron**',
+        "description": f'{DISCORD_EMOJI["calendar"]} {date}',
         "color": 0xFF4FA3,
         "fields": [
-            {"name": f'{DISCORD_EMOJI["trophy"]} TOP MATCHES', "value": "\n\n".join(overlap_lines), "inline": False},
+            {
+                "name": f'{DISCORD_EMOJI["trophy"]} TOP MATCHES',
+                "value": overlap_value,
+                "inline": False,
+            },
         ],
     }
 
