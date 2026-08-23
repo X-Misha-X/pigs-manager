@@ -72,36 +72,214 @@ button {
   @apply min-w-0;
 }
 
-.voter-panel-global {
-  @apply mb-5;
-}
-
 .sidebar-title {
   @apply text-sm;
 }
 
-.section-switch {
-  @apply mb-5 grid grid-cols-2 rounded-lg border p-1;
-  background: rgba(37, 36, 64, 0.72);
+.login-shell {
+  @apply grid min-h-screen px-4 py-5;
+  align-items: start;
+}
+
+.login-card {
+  @apply mx-auto mt-8 grid w-full max-w-6xl gap-7;
+}
+
+.login-brand {
+  @apply text-center;
+}
+
+.login-brand h1 {
+  @apply mt-5 text-xl font-semibold tracking-normal sm:text-2xl;
+  color: rgba(247, 255, 252, 0.9);
+  letter-spacing: 0.08em;
+  text-shadow:
+    1px 0 0 rgba(56, 200, 204, 0.72),
+    -1px 0 0 rgba(164, 236, 212, 0.28),
+    0 0 8px rgba(56, 200, 204, 0.3),
+    0 0 16px rgba(164, 236, 212, 0.16);
+}
+
+.login-panel {
+  @apply w-full rounded-lg border p-5;
+  background: rgba(52, 50, 85, 0.84);
   border-color: rgba(164, 236, 212, 0.14);
-  box-shadow: 0 18px 44px rgba(17, 16, 31, 0.16);
+  box-shadow: 0 24px 70px rgba(17, 16, 31, 0.3);
+  backdrop-filter: blur(18px);
 }
 
-.section-switch button {
-  @apply rounded-md px-3 py-3 text-center text-xs font-semibold uppercase sm:text-sm;
-  color: rgba(247, 255, 252, 0.62);
+.login-brand .eyebrow {
+  @apply text-4xl sm:text-5xl;
 }
 
-.section-switch button.active {
+.login-grid {
+  @apply grid gap-x-8 gap-y-5 sm:grid-cols-2;
+  max-width: 56rem;
+  margin: 0 auto;
+}
+
+.login-user-button {
+  font-family: "ArcadeUsers", "ArcadePixel", monospace;
+}
+
+.login-user-button:hover,
+.login-user-button.active {
   color: var(--mint);
-  background: rgba(56, 200, 204, 0.16);
+  background: transparent;
+  border-color: transparent;
+}
+
+.login-user-button.pending {
+  background: transparent;
+  border-color: transparent;
+}
+
+.admin-login-button {
+  @apply sm:col-span-2 sm:justify-self-center;
+  width: min(100%, 28rem);
+}
+
+.admin-avatar-placeholder {
+  @apply relative z-10 h-24 w-24 shrink-0 rounded-full object-cover;
+  background: rgba(18, 18, 33, 0.58);
+  border: 4px solid rgba(234, 116, 116, 0.9);
   box-shadow:
-    0 0 0 1px rgba(56, 200, 204, 0.42) inset,
-    0 0 16px rgba(56, 200, 204, 0.12);
+    0 0 0 2px rgba(255, 79, 216, 0.2),
+    0 0 18px rgba(234, 116, 116, 0.24),
+    0 0 22px rgba(56, 200, 204, 0.18);
+}
+
+.login-admin-panel {
+  @apply mx-auto mt-5 grid max-w-4xl gap-3 rounded-lg border p-4;
+  background: rgba(18, 18, 33, 0.42);
+  border-color: rgba(255, 79, 216, 0.22);
+}
+
+.login-admin-panel label,
+.login-admin-panel input,
+.login-admin-panel > div {
+  width: min(100%, 34rem);
+  margin-left: auto;
+  margin-right: auto;
+}
+
+.login-admin-panel label {
+  @apply text-xs font-semibold;
+  color: rgba(247, 255, 252, 0.7);
+}
+
+.login-admin-panel input {
+  @apply h-11 rounded-md border px-3 outline-none;
+  background: rgba(18, 18, 33, 0.72);
+  border-color: rgba(164, 236, 212, 0.16);
+  color: white;
+}
+
+.login-admin-panel input:focus {
+  border-color: rgba(56, 200, 204, 0.72);
+  box-shadow: 0 0 0 1px rgba(56, 200, 204, 0.24);
+}
+
+.login-admin-panel > div {
+  @apply grid grid-cols-2 gap-2;
+}
+
+.login-confirm-panel {
+  @apply mx-auto mt-8 flex w-full max-w-4xl items-center gap-8 rounded-lg border py-5 pl-8 pr-5;
+  background: rgba(18, 18, 33, 0.42);
+  border-color: rgba(255, 79, 216, 0.42);
+}
+
+.voter-confirm-avatar {
+  @apply h-28 w-28 shrink-0 rounded-full object-cover;
+  border: 4px solid rgba(56, 200, 204, 0.95);
+  background: rgba(18, 18, 33, 0.5);
+  box-shadow:
+    0 0 0 2px rgba(255, 79, 216, 0.42),
+    0 0 14px rgba(56, 200, 204, 0.72),
+    0 0 30px rgba(56, 200, 204, 0.42),
+    0 0 42px rgba(164, 236, 212, 0.2);
+}
+
+.login-confirm-panel p {
+  @apply text-center text-lg font-semibold uppercase leading-relaxed sm:text-xl;
+  color: rgba(247, 255, 252, 0.86);
+}
+
+.login-confirm-panel strong {
+  color: var(--mint);
+  text-shadow:
+    1px 0 0 rgba(255, 79, 216, 0.95),
+    -1px 0 0 rgba(56, 200, 204, 0.78),
+    0 0 12px rgba(255, 79, 216, 0.42);
+}
+
+.login-confirm-actions {
+  @apply mt-5 flex flex-wrap justify-center gap-3;
+}
+
+.login-confirm-actions button {
+  @apply min-w-44;
+}
+
+.session-actions {
+  @apply relative mr-5 flex flex-wrap items-start justify-start gap-2;
+}
+
+.user-menu {
+  @apply relative;
+}
+
+.user-menu-trigger {
+  @apply inline-flex h-14 items-center gap-3 rounded-lg border px-4 text-base font-semibold uppercase;
+  color: var(--mint);
+  background: rgba(255, 255, 255, 0.07);
+  border-color: rgba(164, 236, 212, 0.18);
+}
+
+.user-menu-trigger:hover {
+  background: rgba(56, 200, 204, 0.14);
+  border-color: rgba(56, 200, 204, 0.52);
+}
+
+.header-user-avatar,
+.header-admin-avatar {
+  @apply h-11 w-11 rounded-full;
+}
+
+.header-user-avatar {
+  @apply object-cover;
+  border: 2px solid rgba(234, 116, 116, 0.92);
+}
+
+.header-admin-avatar {
+  @apply grid place-items-center border;
+  color: var(--mint);
+  background: rgba(18, 18, 33, 0.58);
+  border-color: rgba(255, 79, 216, 0.44);
+}
+
+.user-menu-popover {
+  @apply absolute right-0 top-full z-20 mt-2 min-w-44 rounded-lg border p-2;
+  background: rgba(37, 36, 64, 0.98);
+  border-color: rgba(164, 236, 212, 0.18);
+  box-shadow: 0 20px 50px rgba(17, 16, 31, 0.35);
+}
+
+.user-menu-popover button {
+  @apply w-full rounded-md px-3 py-3 text-left text-xs font-semibold uppercase;
+  color: rgba(247, 255, 252, 0.78);
+}
+
+.user-menu-popover button:hover {
+  color: var(--mint);
+  background: rgba(56, 200, 204, 0.14);
 }
 
 .topbar-inner {
-  @apply flex flex-col gap-4 pb-7 pt-2 sm:flex-row sm:items-start sm:justify-between;
+  @apply flex flex-col gap-4 border-b pb-6 pt-2 sm:flex-row sm:items-start sm:justify-between;
+  border-color: rgba(164, 236, 212, 0.16);
+  box-shadow: 0 16px 34px -30px rgba(164, 236, 212, 0.5);
 }
 
 .topbar h1 {
@@ -136,13 +314,13 @@ button {
   font-smooth: never;
 }
 
-.meta-row {
-  @apply mt-4 flex flex-wrap items-center gap-2 text-xs;
+.screen-meta-row {
+  @apply mb-5 mt-4 flex flex-wrap items-center justify-between gap-3 text-xs;
   color: rgba(247, 255, 252, 0.72);
   letter-spacing: 0.045em;
 }
 
-.meta-row span {
+.screen-meta-row span {
   @apply inline-flex items-center gap-2 rounded-md px-3 py-1.5;
   background: rgba(255, 255, 255, 0.08);
   border: 1px solid rgba(164, 236, 212, 0.12);
@@ -150,6 +328,37 @@ button {
 
 .content-grid {
   @apply grid gap-5 lg:grid-cols-[minmax(390px,420px)_minmax(0,1fr)];
+}
+
+.admin-content-grid {
+  @apply lg:grid-cols-1;
+}
+
+.results-panel {
+  @apply grid gap-4;
+}
+
+.results-tabs {
+  @apply grid grid-cols-2 rounded-lg border p-1;
+  background: rgba(18, 18, 33, 0.42);
+  border-color: rgba(164, 236, 212, 0.12);
+}
+
+.results-tabs button {
+  @apply h-11 rounded-md text-sm font-semibold uppercase transition;
+  color: rgba(247, 255, 252, 0.58);
+}
+
+.results-tabs button.active {
+  color: var(--mint);
+  background: rgba(56, 200, 204, 0.16);
+  box-shadow:
+    0 0 0 1px rgba(56, 200, 204, 0.42) inset,
+    0 0 16px rgba(56, 200, 204, 0.12);
+}
+
+.results-tab-panel {
+  @apply min-h-[28rem];
 }
 
 .panel {
@@ -326,6 +535,7 @@ button {
 
 .share-results-button {
   @apply h-9 px-3 text-xs;
+  min-width: max-content;
 }
 
 .icon-button {
@@ -501,7 +711,8 @@ button {
   color: white;
 }
 
-.voter-button.active .voter-avatar {
+.voter-button.active .voter-avatar,
+.voter-button.active .admin-avatar-placeholder {
   border-color: rgba(164, 236, 212, 0.9);
   box-shadow:
     0 0 0 1px rgba(255, 79, 216, 0.52),
@@ -529,17 +740,26 @@ button {
 }
 
 .voter-button.pending .voter-avatar {
-  border-color: rgba(255, 79, 216, 0.9);
+  border-color: rgba(164, 236, 212, 0.9);
+  box-shadow:
+    0 0 0 1px rgba(255, 79, 216, 0.52),
+    0 0 16px rgba(56, 200, 204, 0.38),
+    0 0 20px rgba(255, 79, 216, 0.2);
 }
 
 .voter-button.pending .voter-button-content > span {
-  border-color: rgba(255, 79, 216, 0.72);
+  border-color: var(--cyan);
   background:
-    linear-gradient(90deg, rgba(255, 79, 216, 0.22), rgba(255, 255, 255, 0.06)),
-    rgba(255, 79, 216, 0.08);
+    linear-gradient(90deg, rgba(56, 200, 204, 0.24), rgba(255, 255, 255, 0.07)),
+    rgba(56, 200, 204, 0.1);
   box-shadow:
-    0 0 0 1px rgba(255, 79, 216, 0.14) inset,
-    0 0 16px rgba(255, 79, 216, 0.18);
+    0 0 0 1px rgba(164, 236, 212, 0.18) inset,
+    0 0 18px rgba(56, 200, 204, 0.2);
+  text-shadow:
+    1px 0 0 rgba(255, 79, 216, 0.95),
+    -1px 0 0 rgba(56, 200, 204, 0.8),
+    0 0 10px rgba(255, 79, 216, 0.42),
+    0 0 14px rgba(56, 200, 204, 0.22);
 }
 
 .voter-button > svg {
@@ -557,75 +777,6 @@ button {
 
   .voter-button-content > span {
     @apply min-h-14 pl-7;
-  }
-}
-
-.voter-confirm {
-  @apply mx-auto mt-6 flex w-full max-w-4xl items-center gap-5 rounded-lg border py-5 pl-8 pr-5;
-  border-color: rgba(255, 79, 216, 0.42);
-  background:
-    radial-gradient(circle at 12% 50%, rgba(56, 200, 204, 0.15), transparent 30%),
-    rgba(18, 18, 33, 0.48);
-  box-shadow:
-    0 0 0 1px rgba(164, 236, 212, 0.08) inset,
-    0 18px 45px rgba(17, 16, 31, 0.22);
-}
-
-.voter-confirm-avatar {
-  @apply h-28 w-28 shrink-0 rounded-full object-cover;
-  border: 4px solid rgba(234, 116, 116, 0.92);
-  background: rgba(18, 18, 33, 0.5);
-  box-shadow:
-    0 0 0 2px rgba(255, 79, 216, 0.22),
-    0 0 22px rgba(234, 116, 116, 0.28),
-    0 0 26px rgba(56, 200, 204, 0.16);
-}
-
-.voter-confirm-body {
-  @apply min-w-0 flex-1;
-}
-
-.voter-confirm p {
-  @apply text-center text-lg font-semibold uppercase leading-relaxed sm:text-xl;
-  color: rgba(247, 255, 252, 0.86);
-}
-
-.voter-confirm strong {
-  color: var(--mint);
-  text-shadow:
-    1px 0 0 rgba(255, 79, 216, 0.95),
-    -1px 0 0 rgba(56, 200, 204, 0.78),
-    0 0 12px rgba(255, 79, 216, 0.42);
-}
-
-.voter-confirm-body > div {
-  @apply mt-5 flex flex-wrap justify-center gap-3;
-}
-
-.voter-confirm button {
-  @apply h-12 min-w-44 rounded-md border px-5 text-xs font-semibold transition;
-  border-color: rgba(164, 236, 212, 0.16);
-  background: rgba(255, 255, 255, 0.06);
-  color: rgba(247, 255, 252, 0.72);
-}
-
-.voter-confirm button:first-child {
-  border-color: rgba(56, 200, 204, 0.58);
-  background: rgba(56, 200, 204, 0.16);
-  color: var(--mint);
-}
-
-@media (max-width: 640px) {
-  .voter-confirm {
-    @apply flex-col gap-3 p-4;
-  }
-
-  .voter-confirm-avatar {
-    @apply h-24 w-24;
-  }
-
-  .voter-confirm button {
-    @apply w-full;
   }
 }
 

@@ -4,11 +4,11 @@ import {
   CalendarDays,
   Check,
   Loader2,
-  MessageCircle,
   Pencil,
   Plus,
   RotateCcw,
   Save,
+  Share2,
   Trash2,
   UserRound,
   X,
@@ -25,7 +25,22 @@ type TimeField = "start" | "end";
 type DialModes = Record<string, "hour" | "minute">;
 type ActiveRangeFields = Record<string, TimeField>;
 type CollapsedRanges = Record<number, boolean>;
-type AppSection = "today" | "game";
+type ResultsTab = "votes" | "matches";
+
+function WhatsappIcon({ size = 16 }: { size?: number }) {
+  return (
+    <svg
+      aria-hidden="true"
+      className="whatsapp-brand-icon"
+      fill="currentColor"
+      height={size}
+      viewBox="0 0 24 24"
+      width={size}
+    >
+      <path d="M20.52 3.49A11.83 11.83 0 0 0 12.07 0C5.5 0 .16 5.34.16 11.91c0 2.1.55 4.15 1.6 5.96L.06 24l6.28-1.65a11.9 11.9 0 0 0 5.72 1.46h.01c6.57 0 11.91-5.34 11.91-11.91 0-3.18-1.24-6.17-3.46-8.41ZM12.07 21.8h-.01a9.9 9.9 0 0 1-5.05-1.38l-.36-.21-3.73.98 1-3.64-.24-.37a9.86 9.86 0 0 1-1.52-5.27c0-5.46 4.45-9.91 9.92-9.91a9.83 9.83 0 0 1 7.01 2.91A9.86 9.86 0 0 1 22 11.9c0 5.47-4.45 9.9-9.93 9.9Zm5.44-7.41c-.3-.15-1.76-.87-2.03-.97-.27-.1-.47-.15-.67.15-.2.3-.77.97-.94 1.17-.17.2-.35.22-.65.07-.3-.15-1.26-.46-2.4-1.48-.89-.79-1.49-1.77-1.66-2.07-.17-.3-.02-.46.13-.61.13-.13.3-.35.45-.52.15-.17.2-.3.3-.5.1-.2.05-.37-.02-.52-.07-.15-.67-1.61-.92-2.2-.24-.58-.49-.5-.67-.51l-.57-.01c-.2 0-.52.07-.79.37-.27.3-1.04 1.02-1.04 2.48s1.07 2.88 1.22 3.08c.15.2 2.1 3.2 5.08 4.49.71.31 1.26.49 1.69.63.71.23 1.36.2 1.88.12.57-.09 1.76-.72 2-1.41.25-.7.25-1.29.17-1.42-.07-.12-.27-.2-.57-.35Z" />
+    </svg>
+  );
+}
 
 type Vote = {
   date?: string;
@@ -105,6 +120,7 @@ const VOTER_AVATARS: Record<string, string> = {
   SEPIA: "/avatars/sepia.png",
   ICHITBO: "/avatars/ichitbo.png",
 };
+const ADMIN_AVATAR = "/avatars/admin.png";
 const GAMES_STORAGE_KEY = "pigs-manager-games";
 const MINUTES = Array.from({ length: 12 }, (_, index) => String(index * 5).padStart(2, "0"));
 const HOURS = Array.from({ length: 24 }, (_, index) => String(index).padStart(2, "0"));
@@ -721,29 +737,8 @@ async function request<T>(path: string, options?: RequestInit): Promise<T> {
   return response.json();
 }
 
-function App() {
-  const [activeSection, setActiveSection] = useState<AppSection>("today");
-  const [summary, setSummary] = useState<Summary | null>(null);
-  const [voterName, setVoterName] = useState("");
-  const [pendingVoterName, setPendingVoterName] = useState("");
-  const [canPlay, setCanPlay] = useState<boolean | null>(null);
-  const [ranges, setRanges] = useState<Range[]>([DEFAULT_RANGE]);
-  const [comment, setComment] = useState("");
-  const [savedRanges, setSavedRanges] = useState<Range[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [saving, setSaving] = useState(false);
-  const [error, setError] = useState("");
-  const [notificationNotice, setNotificationNotice] = useState("");
-  const [dialModes, setDialModes] = useState<DialModes>({});
-  const [activeRangeFields, setActiveRangeFields] = useState<ActiveRangeFields>({});
-  const [collapsedRanges, setCollapsedRanges] = useState<CollapsedRanges>({});
-  const [adminOpen, setAdminOpen] = useState(false);
-  const [adminPin, setAdminPin] = useState("");
-  const [adminUnlocked, setAdminUnlocked] = useState(false);
-  const [adminDeleting, setAdminDeleting] = useState(false);
-  const [adminError, setAdminError] = useState("");
-  const [adminConfirming, setAdminConfirming] = useState(false);
-  const [overlapFilters, setOverlapFilters] = useState<string[]>(VOTERS);
+// Paused feature: keep the game voting panel ready to re-enable without rebuilding it.
+function GameVotePanel({ voterName }: { voterName: string }) {
   const [games, setGames] = useState<GameOption[]>(() => (USE_SUPABASE ? [] : readStoredGames()));
   const [gamesLoading, setGamesLoading] = useState(true);
   const [gameSaving, setGameSaving] = useState(false);
@@ -753,30 +748,6 @@ function App() {
   const [editingGameName, setEditingGameName] = useState("");
   const [gameToDelete, setGameToDelete] = useState<GameOption | null>(null);
 
-  const currentVote = useMemo(
-    () => summary?.votes.find((vote) => vote.voter.toLowerCase() === voterName.toLowerCase()),
-    [summary, voterName],
-  );
-  const filteredOverlaps = useMemo(() => {
-    const overlaps = summary?.overlaps ?? [];
-    if (overlapFilters.length === VOTERS.length) return overlaps;
-    if (overlapFilters.length < 2) return [];
-    return overlaps.filter((overlap) => overlap.voters.every((voter) => overlapFilters.includes(voter)));
-  }, [overlapFilters, summary?.overlaps]);
-  const resultVotes = useMemo(
-    () =>
-      VOTERS.map(
-        (name) =>
-          summary?.votes.find((vote) => vote.voter.toLowerCase() === name.toLowerCase()) ?? {
-            voter: name,
-            canPlay: true,
-            ranges: [],
-            comment: "",
-            updatedAt: "",
-          },
-      ),
-    [summary?.votes],
-  );
   const sortedGames = useMemo(
     () =>
       [...games].sort((firstGame, secondGame) => {
@@ -787,18 +758,6 @@ function App() {
       }),
     [games],
   );
-
-  async function loadSummary() {
-    setLoading(true);
-    setError("");
-    try {
-      setSummary(await loadAppSummary());
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "No se pudieron cargar los votos");
-    } finally {
-      setLoading(false);
-    }
-  }
 
   async function loadGames() {
     setGamesLoading(true);
@@ -813,7 +772,6 @@ function App() {
   }
 
   useEffect(() => {
-    loadSummary();
     loadGames();
   }, []);
 
@@ -822,61 +780,6 @@ function App() {
       localStorage.setItem(GAMES_STORAGE_KEY, JSON.stringify(games));
     }
   }, [games, gamesLoading]);
-
-  useEffect(() => {
-    if (!voterName) {
-      setCanPlay(null);
-      setRanges([]);
-      setComment("");
-      setSavedRanges([]);
-      return;
-    }
-
-    if (currentVote) {
-      setCanPlay(currentVote.canPlay);
-      const loadedRanges = currentVote.ranges;
-      setRanges(loadedRanges);
-      setComment(currentVote.comment);
-      setSavedRanges(currentVote.ranges);
-      setCollapsedRanges(
-        currentVote.canPlay
-          ? Object.fromEntries(loadedRanges.map((_, index) => [index, true]))
-          : {},
-      );
-      return;
-    }
-
-    setCanPlay(null);
-    setRanges([]);
-    setComment("");
-    setSavedRanges([]);
-    setCollapsedRanges({});
-  }, [currentVote, voterName]);
-
-  function requestVoterConfirmation(name: string) {
-    if (voterName === name) return;
-    resetVotingFlow();
-    setPendingVoterName(name);
-    setError("");
-    setNotificationNotice("");
-  }
-
-  function confirmVoter() {
-    if (!pendingVoterName) return;
-    setVoterName(pendingVoterName);
-    setPendingVoterName("");
-    setError("");
-  }
-
-  function cancelVoterConfirmation() {
-    setPendingVoterName("");
-  }
-
-  function toggleOverlapFilter(name: string) {
-    setOverlapFilters((items) =>
-      items.includes(name) ? items.filter((item) => item !== name) : [...items, name],
-    );
-  }
 
   async function addGame() {
     const trimmedName = newGameName.trim();
@@ -963,11 +866,439 @@ function App() {
     }
   }
 
+  return (
+    <section className="panel game-panel">
+      <div className="section-heading">
+        <h2 className="panel-title">QUE SE JUEGA?</h2>
+      </div>
+
+      <div className="game-add-row">
+        <input
+          placeholder="Nombre del juego"
+          value={newGameName}
+          onChange={(event) => {
+            setNewGameName(event.target.value);
+            setGameError("");
+          }}
+          onKeyDown={(event) => {
+            if (event.key === "Enter") {
+              addGame();
+            }
+          }}
+          disabled={gameSaving}
+        />
+        <button className="secondary-button" onClick={addGame} disabled={gameSaving}>
+          <Plus size={17} />
+          AGREGAR JUEGO
+        </button>
+      </div>
+
+      {gameError ? <p className="error-text">{gameError}</p> : null}
+
+      <div className="game-list">
+        {gamesLoading ? (
+          <p className="empty-state">Cargando juegos...</p>
+        ) : sortedGames.length ? (
+          sortedGames.map((game) => {
+            const checked = voterName ? game.voters.includes(voterName) : false;
+            return (
+              <article className="game-row" key={game.id}>
+                <div className="game-main">
+                  <label>
+                    <input
+                      type="checkbox"
+                      checked={checked}
+                      onChange={() => toggleGameVote(game)}
+                      disabled={!voterName || gameSaving}
+                    />
+                    <span>{game.name}</span>
+                  </label>
+                </div>
+                <div className="game-voters">
+                  {game.voters.length ? (
+                    game.voters.map((voter) => <span key={voter}>{voter}</span>)
+                  ) : (
+                    <em>Sin votos</em>
+                  )}
+                </div>
+                <div className="game-actions">
+                  <button className="icon-button small" onClick={() => openEditGame(game)} title="Editar juego" disabled={gameSaving}>
+                    <Pencil size={15} />
+                  </button>
+                  <button className="icon-button small danger-button" onClick={() => setGameToDelete(game)} title="Eliminar juego" disabled={gameSaving}>
+                    <Trash2 size={15} />
+                  </button>
+                </div>
+              </article>
+            );
+          })
+        ) : (
+          <p className="empty-state">Todavia no hay juegos cargados.</p>
+        )}
+      </div>
+
+      {editingGame ? (
+        <div className="inline-modal" role="dialog" aria-modal="true" aria-label="Editar juego">
+          <div className="inline-modal-panel">
+            <div>
+              <h3>EDITAR JUEGO</h3>
+              <p>Los votos existentes se conservan.</p>
+            </div>
+            <input
+              value={editingGameName}
+              onChange={(event) => setEditingGameName(event.target.value)}
+              onKeyDown={(event) => {
+                if (event.key === "Enter") saveEditGame();
+                if (event.key === "Escape") closeEditGame();
+              }}
+              autoFocus
+              disabled={gameSaving}
+            />
+            <div className="inline-modal-actions">
+              <button className="secondary-button" onClick={closeEditGame} disabled={gameSaving}>
+                CANCELAR
+              </button>
+              <button className="primary-button" onClick={saveEditGame} disabled={gameSaving}>
+                GUARDAR
+              </button>
+            </div>
+          </div>
+        </div>
+      ) : null}
+
+      {gameToDelete ? (
+        <div className="inline-modal" role="dialog" aria-modal="true" aria-label="Eliminar juego">
+          <div className="inline-modal-panel">
+            <div>
+              <h3>ELIMINAR JUEGO</h3>
+              <p>Seguro que queres eliminar {gameToDelete.name}? Tambien se borran sus votos.</p>
+            </div>
+            <div className="inline-modal-actions">
+              <button className="secondary-button" onClick={() => setGameToDelete(null)} disabled={gameSaving}>
+                CANCELAR
+              </button>
+              <button className="secondary-button danger-action" onClick={() => removeGame(gameToDelete.id)} disabled={gameSaving}>
+                <Trash2 size={15} />
+                ELIMINAR
+              </button>
+            </div>
+          </div>
+        </div>
+      ) : null}
+    </section>
+  );
+}
+
+function LoginScreen({
+  adminError,
+  adminOpen,
+  adminPin,
+  onAdminCancel,
+  onAdminOpen,
+  onAdminPinChange,
+  onAdminUnlock,
+  onSelectVoter,
+}: {
+  adminError: string;
+  adminOpen: boolean;
+  adminPin: string;
+  onAdminCancel: () => void;
+  onAdminOpen: () => void;
+  onAdminPinChange: (value: string) => void;
+  onAdminUnlock: () => void;
+  onSelectVoter: (name: string) => void;
+}) {
+  const [pendingVoterName, setPendingVoterName] = useState("");
+
+  function requestVoterConfirmation(name: string) {
+    setPendingVoterName(name);
+    onAdminCancel();
+  }
+
+  function confirmVoter() {
+    if (!pendingVoterName) return;
+    onSelectVoter(pendingVoterName);
+    setPendingVoterName("");
+  }
+
+  function cancelVoterConfirmation() {
+    setPendingVoterName("");
+  }
+
+  return (
+    <main className="app-shell login-shell">
+      <section className="login-card">
+        <div className="login-brand">
+          <p className="eyebrow">Pigs Manager</p>
+          <h1>POR UN VICIO MEJOR</h1>
+        </div>
+
+        <div className="login-panel">
+          <h2 className="panel-title step-title sidebar-title">
+            <span>
+              <UserRound size={15} />
+            </span>
+            SELECCIONA TU USUARIO
+          </h2>
+          <div className="login-grid">
+            {VOTERS.map((name) => (
+              <button
+                className={`voter-button login-user-button ${pendingVoterName === name ? "pending" : ""}`}
+                key={name}
+                onClick={() => requestVoterConfirmation(name)}
+              >
+                <span className="voter-button-content">
+                  <img className="voter-avatar" src={VOTER_AVATARS[name]} alt="" aria-hidden="true" />
+                  <span>{name}</span>
+                </span>
+              </button>
+            ))}
+            <button
+              className={`voter-button login-user-button admin-login-button ${adminOpen ? "active" : ""}`}
+              onClick={() => {
+                setPendingVoterName("");
+                onAdminOpen();
+              }}
+            >
+              <span className="voter-button-content">
+                <img className="admin-avatar-placeholder" src={ADMIN_AVATAR} alt="" aria-hidden="true" />
+                <span>ADMIN</span>
+              </span>
+            </button>
+          </div>
+
+          {pendingVoterName ? (
+            <div className="login-confirm-panel">
+              <img className="voter-confirm-avatar" src={VOTER_AVATARS[pendingVoterName]} alt="" aria-hidden="true" />
+              <div>
+                <p>
+                  Estas ingresando con <strong>{pendingVoterName}</strong>. Confirmar?
+                </p>
+                <div className="login-confirm-actions">
+                  <button className="primary-button" onClick={confirmVoter}>
+                    SI, SOY {pendingVoterName}
+                  </button>
+                  <button className="secondary-button" onClick={cancelVoterConfirmation}>
+                    CANCELAR
+                  </button>
+                </div>
+              </div>
+            </div>
+          ) : null}
+
+          {adminOpen ? (
+            <div className="login-admin-panel">
+              <label htmlFor="login-admin-pin">PIN</label>
+              <input
+                id="login-admin-pin"
+                inputMode="numeric"
+                type="password"
+                value={adminPin}
+                onChange={(event) => onAdminPinChange(event.target.value)}
+                onKeyDown={(event) => {
+                  if (event.key === "Enter") onAdminUnlock();
+                  if (event.key === "Escape") onAdminCancel();
+                }}
+                autoFocus
+              />
+              <div>
+                <button className="secondary-button" onClick={onAdminCancel}>
+                  CANCELAR
+                </button>
+                <button className="primary-button" onClick={onAdminUnlock}>
+                  ENTRAR
+                </button>
+              </div>
+              {adminError ? <p className="error-text">{adminError}</p> : null}
+            </div>
+          ) : null}
+        </div>
+      </section>
+    </main>
+  );
+}
+
+function UserSessionMenu({
+  admin,
+  onLogout,
+  voterName,
+}: {
+  admin: boolean;
+  onLogout: () => void;
+  voterName: string;
+}) {
+  const [open, setOpen] = useState(false);
+  const label = admin ? "ADMIN" : voterName;
+
+  return (
+    <div className="user-menu">
+      <button
+        className="user-menu-trigger"
+        onClick={() => setOpen((value) => !value)}
+        aria-expanded={open}
+        aria-haspopup="menu"
+        title={label}
+      >
+        {admin ? (
+          <img className="header-admin-avatar" src={ADMIN_AVATAR} alt="" aria-hidden="true" />
+        ) : (
+          <img className="header-user-avatar" src={VOTER_AVATARS[voterName]} alt="" aria-hidden="true" />
+        )}
+        <span>{label}</span>
+      </button>
+      {open ? (
+        <div className="user-menu-popover" role="menu">
+          <button
+            role="menuitem"
+            onClick={() => {
+              setOpen(false);
+              onLogout();
+            }}
+          >
+            CERRAR SESION
+          </button>
+        </div>
+      ) : null}
+    </div>
+  );
+}
+
+function App() {
+  const [summary, setSummary] = useState<Summary | null>(null);
+  const [voterName, setVoterName] = useState("");
+  const [canPlay, setCanPlay] = useState<boolean | null>(null);
+  const [ranges, setRanges] = useState<Range[]>([DEFAULT_RANGE]);
+  const [comment, setComment] = useState("");
+  const [savedRanges, setSavedRanges] = useState<Range[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState("");
+  const [notificationNotice, setNotificationNotice] = useState("");
+  const [dialModes, setDialModes] = useState<DialModes>({});
+  const [activeRangeFields, setActiveRangeFields] = useState<ActiveRangeFields>({});
+  const [collapsedRanges, setCollapsedRanges] = useState<CollapsedRanges>({});
+  const [adminOpen, setAdminOpen] = useState(false);
+  const [adminPin, setAdminPin] = useState("");
+  const [adminUnlocked, setAdminUnlocked] = useState(false);
+  const [adminDeleting, setAdminDeleting] = useState(false);
+  const [adminError, setAdminError] = useState("");
+  const [adminConfirming, setAdminConfirming] = useState(false);
+  const [overlapFilters, setOverlapFilters] = useState<string[]>(VOTERS);
+  const [resultsTab, setResultsTab] = useState<ResultsTab>("votes");
+
+  const currentVote = useMemo(
+    () => summary?.votes.find((vote) => vote.voter.toLowerCase() === voterName.toLowerCase()),
+    [summary, voterName],
+  );
+  const filteredOverlaps = useMemo(() => {
+    const overlaps = summary?.overlaps ?? [];
+    if (overlapFilters.length === VOTERS.length) return overlaps;
+    if (overlapFilters.length < 2) return [];
+    return overlaps.filter((overlap) => overlap.voters.every((voter) => overlapFilters.includes(voter)));
+  }, [overlapFilters, summary?.overlaps]);
+  const resultVotes = useMemo(
+    () =>
+      VOTERS.map(
+        (name) =>
+          summary?.votes.find((vote) => vote.voter.toLowerCase() === name.toLowerCase()) ?? {
+            voter: name,
+            canPlay: true,
+            ranges: [],
+            comment: "",
+            updatedAt: "",
+          },
+      ),
+    [summary?.votes],
+  );
+  async function loadSummary() {
+    setLoading(true);
+    setError("");
+    try {
+      setSummary(await loadAppSummary());
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "No se pudieron cargar los votos");
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  useEffect(() => {
+    loadSummary();
+  }, []);
+
+  useEffect(() => {
+    if (!voterName) {
+      setCanPlay(null);
+      setRanges([]);
+      setComment("");
+      setSavedRanges([]);
+      return;
+    }
+
+    if (currentVote) {
+      setCanPlay(currentVote.canPlay);
+      const loadedRanges = currentVote.ranges;
+      setRanges(loadedRanges);
+      setComment(currentVote.comment);
+      setSavedRanges(currentVote.ranges);
+      setCollapsedRanges(
+        currentVote.canPlay
+          ? Object.fromEntries(loadedRanges.map((_, index) => [index, true]))
+          : {},
+      );
+      return;
+    }
+
+    setCanPlay(null);
+    setRanges([]);
+    setComment("");
+    setSavedRanges([]);
+    setCollapsedRanges({});
+  }, [currentVote, voterName]);
+
+  function selectVoter(name: string) {
+    setVoterName(name);
+    setAdminOpen(false);
+    setAdminPin("");
+    setAdminError("");
+    setAdminUnlocked(false);
+    setError("");
+    setNotificationNotice("");
+  }
+
+  function openAdminLogin() {
+    resetVotingFlow();
+    setAdminOpen(true);
+    setAdminError("");
+  }
+
+  function cancelAdminLogin() {
+    setAdminOpen(false);
+    setAdminPin("");
+    setAdminError("");
+  }
+
+  function exitSession() {
+    resetVotingFlow();
+    setAdminUnlocked(false);
+    setAdminOpen(false);
+    setAdminPin("");
+    setAdminError("");
+    setAdminConfirming(false);
+    setError("");
+    setNotificationNotice("");
+  }
+
+  function toggleOverlapFilter(name: string) {
+    setOverlapFilters((items) =>
+      items.includes(name) ? items.filter((item) => item !== name) : [...items, name],
+    );
+  }
+
   function resetVotingFlow(options: { keepVoter?: boolean } = {}) {
     if (!options.keepVoter) {
       setVoterName("");
     }
-    setPendingVoterName("");
     setCanPlay(null);
     setRanges([]);
     setComment("");
@@ -1159,6 +1490,7 @@ function App() {
       return;
     }
     setAdminUnlocked(true);
+    setAdminOpen(false);
   }
 
   async function deleteDayVotes() {
@@ -1192,6 +1524,21 @@ function App() {
     window.open(`https://api.whatsapp.com/send?text=${encodeURIComponent(message)}`, "_blank", "noopener,noreferrer");
   }
 
+  if (!voterName && !adminUnlocked) {
+    return (
+      <LoginScreen
+        adminError={adminError}
+        adminOpen={adminOpen}
+        adminPin={adminPin}
+        onAdminCancel={cancelAdminLogin}
+        onAdminOpen={openAdminLogin}
+        onAdminPinChange={setAdminPin}
+        onAdminUnlock={unlockAdmin}
+        onSelectVoter={selectVoter}
+      />
+    );
+  }
+
   return (
     <main className="app-shell">
       <div className="app-layout">
@@ -1201,80 +1548,43 @@ function App() {
               <div>
                 <p className="eyebrow">Pigs Manager</p>
                 <h1>POR UN VICIO MEJOR</h1>
-                <div className="meta-row">
-                  <span>
-                    <CalendarDays size={16} />
-                    {dateLabel}
-                  </span>
-                </div>
               </div>
-              <AdminControls
-                adminDeleting={adminDeleting}
-                adminError={adminError}
-                adminOpen={adminOpen}
-                adminPin={adminPin}
-                adminUnlocked={adminUnlocked}
-                adminConfirming={adminConfirming}
-                onCancelConfirm={() => setAdminConfirming(false)}
-                onDelete={deleteDayVotes}
-                onPinChange={setAdminPin}
-                onRequestDelete={() => setAdminConfirming(true)}
-                onToggle={() => setAdminOpen((value) => !value)}
-                onUnlock={unlockAdmin}
-              />
+              <div className="session-actions">
+                {!voterName ? (
+                  <AdminControls
+                    adminDeleting={adminDeleting}
+                    adminError={adminError}
+                    adminOpen={adminOpen}
+                    adminPin={adminPin}
+                    adminUnlocked={adminUnlocked}
+                    adminConfirming={adminConfirming}
+                    onCancelConfirm={() => setAdminConfirming(false)}
+                    onDelete={deleteDayVotes}
+                    onPinChange={setAdminPin}
+                    onRequestDelete={() => setAdminConfirming(true)}
+                    onToggle={() => setAdminOpen((value) => !value)}
+                    onUnlock={unlockAdmin}
+                  />
+                ) : null}
+                <UserSessionMenu admin={adminUnlocked && !voterName} voterName={voterName} onLogout={exitSession} />
+              </div>
             </div>
           </header>
 
-          <div className="section-switch" aria-label="Secciones">
-            <button className={activeSection === "today" ? "active" : ""} onClick={() => setActiveSection("today")}>
-              HOY SE JUEGA?
-            </button>
-            <button className={activeSection === "game" ? "active" : ""} onClick={() => setActiveSection("game")}>
-              QUE SE JUEGA?
+          <div className="screen-meta-row">
+            <span>
+              <CalendarDays size={16} />
+              {dateLabel}
+            </span>
+            <button className="secondary-button share-results-button" onClick={shareResultsOnWhatsapp} disabled={!summary || !summary.votes.length}>
+              <Share2 size={15} />
+              <WhatsappIcon size={16} />
+              COMPARTIR RESULTADOS
             </button>
           </div>
 
-          <section className="panel voter-panel-global">
-            <h2 className="panel-title step-title sidebar-title">
-              <span>
-                <UserRound size={15} />
-              </span>
-              PIG QUE VOTA:
-            </h2>
-            <div className="voter-grid">
-              {VOTERS.map((name) => (
-                <button
-                  className={`voter-button ${voterName === name ? "active" : ""} ${pendingVoterName === name ? "pending" : ""}`}
-                  key={name}
-                  onClick={() => requestVoterConfirmation(name)}
-                >
-                  <span className="voter-button-content">
-                    <img className="voter-avatar" src={VOTER_AVATARS[name]} alt="" aria-hidden="true" />
-                    <span>{name}</span>
-                  </span>
-                  {voterName === name ? <Check size={18} /> : null}
-                </button>
-              ))}
-            </div>
-
-            {pendingVoterName ? (
-              <div className="voter-confirm">
-                <img className="voter-confirm-avatar" src={VOTER_AVATARS[pendingVoterName]} alt="" aria-hidden="true" />
-                <div className="voter-confirm-body">
-                  <p>
-                    Estas votando como <strong>{pendingVoterName}</strong>. Continuar?
-                  </p>
-                  <div>
-                    <button onClick={confirmVoter}>SI, SOY {pendingVoterName}</button>
-                    <button onClick={cancelVoterConfirmation}>CANCELAR</button>
-                  </div>
-                </div>
-              </div>
-            ) : null}
-          </section>
-
-          {activeSection === "today" ? (
-            <div className="content-grid">
+          <div className={`content-grid ${voterName ? "" : "admin-content-grid"}`}>
+            {voterName ? (
               <section className="space-y-4">
                 {voterName ? (
                   <div className="panel vote-panel">
@@ -1364,209 +1674,108 @@ function App() {
                   </div>
                 ) : null}
               </section>
+            ) : null}
 
               <section className="space-y-6">
-                <div className="panel">
-                  <div className="section-heading">
-                    <h2 className="panel-title">RESULTADOS DEL DIA</h2>
-                    <div className="result-actions">
-                      <span>{summary?.votes.length ?? 0} confirmaron</span>
-                      <button className="secondary-button share-results-button" onClick={shareResultsOnWhatsapp} disabled={!summary || !summary.votes.length}>
-                        <MessageCircle size={16} />
-                        WHATSAPP
-                      </button>
-                    </div>
+                <div className="panel results-panel">
+                  <div className="results-tabs" role="tablist" aria-label="Resultados">
+                    <button
+                      className={resultsTab === "votes" ? "active" : ""}
+                      onClick={() => setResultsTab("votes")}
+                      role="tab"
+                      aria-selected={resultsTab === "votes"}
+                    >
+                      VOTOS
+                    </button>
+                    <button
+                      className={resultsTab === "matches" ? "active" : ""}
+                      onClick={() => setResultsTab("matches")}
+                      role="tab"
+                      aria-selected={resultsTab === "matches"}
+                    >
+                      MATCHES
+                    </button>
                   </div>
-                  {summary?.suggestions?.length ? (
-                    <div className="range-suggestions">
-                      <h3>SUGERENCIAS</h3>
-                      <div>
-                        {summary.suggestions.map((suggestion) => (
-                          <button
-                            className="range-chip"
-                            key={`${suggestion.start}-${suggestion.end}`}
-                            onClick={() => addResultRangeToMyVote(suggestion)}
-                            title="Agregar este rango a mi voto"
-                          >
-                            <strong>{formatRange(suggestion)}</strong>
-                            <Plus size={16} />
-                          </button>
+
+                  {resultsTab === "votes" ? (
+                    <div className="results-tab-panel" role="tabpanel">
+                      <div className="section-heading">
+                        <h2 className="panel-title">VOTOS</h2>
+                        <div className="result-actions">
+                          <span>{summary?.votes.length ?? 0} confirmaron</span>
+                        </div>
+                      </div>
+                      {summary?.suggestions?.length ? (
+                        <div className="range-suggestions">
+                          <h3>SUGERENCIAS</h3>
+                          <div>
+                            {summary.suggestions.map((suggestion) => (
+                              <button
+                                className="range-chip"
+                                key={`${suggestion.start}-${suggestion.end}`}
+                                onClick={() => addResultRangeToMyVote(suggestion)}
+                                title="Agregar este rango a mi voto"
+                              >
+                                <strong>{formatRange(suggestion)}</strong>
+                                <Plus size={16} />
+                              </button>
+                            ))}
+                          </div>
+                        </div>
+                      ) : null}
+                      <div className="mt-4 grid gap-3">
+                        {resultVotes.map((vote) => (
+                          <VoteCard
+                            key={vote.voter}
+                            vote={vote}
+                            currentVoter={voterName}
+                            onAddRange={addResultRangeToMyVote}
+                            onRemoveOwnRange={removeResultRangeFromMyVote}
+                          />
                         ))}
                       </div>
                     </div>
-                  ) : null}
-                  <div className="mt-4 grid gap-3">
-                    {resultVotes.map((vote) => (
-                      <VoteCard
-                        key={vote.voter}
-                        vote={vote}
-                        currentVoter={voterName}
-                        onAddRange={addResultRangeToMyVote}
-                        onRemoveOwnRange={removeResultRangeFromMyVote}
-                      />
-                    ))}
-                  </div>
-                </div>
-
-                <div className="panel">
-                  <div className="section-heading">
-                    <h2 className="panel-title">COINCIDENCIAS</h2>
-                    <span>{filteredOverlaps.length} matches</span>
-                  </div>
-                  <div className="overlap-filter" aria-label="Filtrar coincidencias por jugador">
-                    <span>Filtrar por:</span>
-                    {VOTERS.map((name) => (
-                      <button
-                        className={overlapFilters.includes(name) ? "active" : ""}
-                        key={name}
-                        onClick={() => toggleOverlapFilter(name)}
-                      >
-                        <span>{name}</span>
-                      </button>
-                    ))}
-                  </div>
-                  <div className="overlap-list mt-4 grid gap-3">
-                    {filteredOverlaps.length ? (
-                      filteredOverlaps.map((overlap) => (
-                        <div className="overlap-row" key={`${overlap.start}-${overlap.end}-${overlap.voters.join("-")}`}>
-                            <strong>{formatRange(overlap)}</strong>
-                          <span className="avatar-stack" aria-label={overlap.voters.join(", ")}>
-                            {overlap.voters.map((voter) => (
-                              <PlayerAvatar key={voter} name={voter} size="mini" />
-                            ))}
-                          </span>
-                        </div>
-                      ))
-                    ) : summary?.overlaps.length ? (
-                      <p className="empty-state">No hay coincidencias con ese filtro.</p>
-                    ) : (
-                      <p className="empty-state">Cuando haya horarios compatibles entre dos o mas personas, apareceran aca.</p>
-                    )}
-                  </div>
+                  ) : (
+                    <div className="results-tab-panel" role="tabpanel">
+                      <div className="section-heading">
+                        <h2 className="panel-title">MATCHES</h2>
+                        <span>{filteredOverlaps.length} matches</span>
+                      </div>
+                      <div className="overlap-filter" aria-label="Filtrar coincidencias por jugador">
+                        <span>Filtrar por:</span>
+                        {VOTERS.map((name) => (
+                          <button
+                            className={overlapFilters.includes(name) ? "active" : ""}
+                            key={name}
+                            onClick={() => toggleOverlapFilter(name)}
+                          >
+                            <span>{name}</span>
+                          </button>
+                        ))}
+                      </div>
+                      <div className="overlap-list mt-4 grid gap-3">
+                        {filteredOverlaps.length ? (
+                          filteredOverlaps.map((overlap) => (
+                            <div className="overlap-row" key={`${overlap.start}-${overlap.end}-${overlap.voters.join("-")}`}>
+                              <strong>{formatRange(overlap)}</strong>
+                              <span className="avatar-stack" aria-label={overlap.voters.join(", ")}>
+                                {overlap.voters.map((voter) => (
+                                  <PlayerAvatar key={voter} name={voter} size="mini" />
+                                ))}
+                              </span>
+                            </div>
+                          ))
+                        ) : summary?.overlaps.length ? (
+                          <p className="empty-state">No hay coincidencias con ese filtro.</p>
+                        ) : (
+                          <p className="empty-state">Cuando haya horarios compatibles entre dos o mas personas, apareceran aca.</p>
+                        )}
+                      </div>
+                    </div>
+                  )}
                 </div>
               </section>
-            </div>
-          ) : (
-            <section className="panel game-panel">
-                <div className="section-heading">
-                  <h2 className="panel-title">QUE SE JUEGA?</h2>
-                </div>
-
-              <div className="game-add-row">
-                <input
-                  placeholder="Nombre del juego"
-                  value={newGameName}
-                  onChange={(event) => {
-                    setNewGameName(event.target.value);
-                    setGameError("");
-                  }}
-                  onKeyDown={(event) => {
-                    if (event.key === "Enter") {
-                      addGame();
-                    }
-                  }}
-                  disabled={gameSaving}
-                />
-                <button className="secondary-button" onClick={addGame} disabled={gameSaving}>
-                  <Plus size={17} />
-                  AGREGAR JUEGO
-                </button>
-              </div>
-
-              {gameError ? <p className="error-text">{gameError}</p> : null}
-
-              <div className="game-list">
-                {gamesLoading ? (
-                  <p className="empty-state">Cargando juegos...</p>
-                ) : sortedGames.length ? (
-                  sortedGames.map((game) => {
-                    const checked = voterName ? game.voters.includes(voterName) : false;
-                    return (
-                      <article className="game-row" key={game.id}>
-                        <div className="game-main">
-                          <label>
-                            <input
-                              type="checkbox"
-                              checked={checked}
-                              onChange={() => toggleGameVote(game)}
-                              disabled={!voterName || gameSaving}
-                            />
-                            <span>{game.name}</span>
-                          </label>
-                        </div>
-                        <div className="game-voters">
-                          {game.voters.length ? (
-                            game.voters.map((voter) => <span key={voter}>{voter}</span>)
-                          ) : (
-                            <em>Sin votos</em>
-                          )}
-                        </div>
-                        <div className="game-actions">
-                          <button className="icon-button small" onClick={() => openEditGame(game)} title="Editar juego" disabled={gameSaving}>
-                            <Pencil size={15} />
-                          </button>
-                          <button className="icon-button small danger-button" onClick={() => setGameToDelete(game)} title="Eliminar juego" disabled={gameSaving}>
-                            <Trash2 size={15} />
-                          </button>
-                        </div>
-                      </article>
-                    );
-                  })
-                ) : (
-                  <p className="empty-state">Todavia no hay juegos cargados.</p>
-                )}
-              </div>
-
-              {editingGame ? (
-                <div className="inline-modal" role="dialog" aria-modal="true" aria-label="Editar juego">
-                  <div className="inline-modal-panel">
-                    <div>
-                      <h3>EDITAR JUEGO</h3>
-                      <p>Los votos existentes se conservan.</p>
-                    </div>
-                    <input
-                      value={editingGameName}
-                      onChange={(event) => setEditingGameName(event.target.value)}
-                      onKeyDown={(event) => {
-                        if (event.key === "Enter") saveEditGame();
-                        if (event.key === "Escape") closeEditGame();
-                      }}
-                      autoFocus
-                      disabled={gameSaving}
-                    />
-                    <div className="inline-modal-actions">
-                      <button className="secondary-button" onClick={closeEditGame} disabled={gameSaving}>
-                        CANCELAR
-                      </button>
-                      <button className="primary-button" onClick={saveEditGame} disabled={gameSaving}>
-                        GUARDAR
-                      </button>
-                    </div>
-                  </div>
-                </div>
-              ) : null}
-
-              {gameToDelete ? (
-                <div className="inline-modal" role="dialog" aria-modal="true" aria-label="Eliminar juego">
-                  <div className="inline-modal-panel">
-                    <div>
-                      <h3>ELIMINAR JUEGO</h3>
-                      <p>Seguro que queres eliminar {gameToDelete.name}? Tambien se borran sus votos.</p>
-                    </div>
-                    <div className="inline-modal-actions">
-                      <button className="secondary-button" onClick={() => setGameToDelete(null)} disabled={gameSaving}>
-                        CANCELAR
-                      </button>
-                      <button className="secondary-button danger-action" onClick={() => removeGame(gameToDelete.id)} disabled={gameSaving}>
-                        <Trash2 size={15} />
-                        ELIMINAR
-                      </button>
-                    </div>
-                  </div>
-                </div>
-              ) : null}
-            </section>
-          )}
+          </div>
         </div>
       </div>
     </main>
