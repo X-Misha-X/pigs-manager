@@ -45,12 +45,12 @@ La app puede avisar automaticamente en Discord cuando ya votaron todos los integ
 ```bash
 DISCORD_WEBHOOK_URL=https://discord.com/api/webhooks/...
 SUPABASE_SERVICE_ROLE_KEY=tu-service-role-key
-NOTIFICATION_ADMIN_PIN=tu-pin-admin
+ADMIN_PIN=tu-pin-admin
 ```
 
-`DISCORD_WEBHOOK_URL`, `SUPABASE_SERVICE_ROLE_KEY` y `NOTIFICATION_ADMIN_PIN` son secretos del servidor: no deben tener prefijo `VITE_`.
+`DISCORD_WEBHOOK_URL`, `SUPABASE_SERVICE_ROLE_KEY` y `ADMIN_PIN` son secretos del servidor: no deben tener prefijo `VITE_`.
 
-Para usar el panel `ADMIN` en local (`http://127.0.0.1:5173`), agregar tambien `VITE_ADMIN_PIN` en `.env.local`. El navegador local no lee las variables configuradas en Vercel.
+Para usar el panel `ADMIN` en local (`http://127.0.0.1:5173`), agregar tambien `ADMIN_PIN` en `.env.local`. Al correr `npm run dev`, la app lo adapta automaticamente para el navegador local.
 
 3. Ejecutar en Supabase el contenido actualizado de `supabase/schema.sql`.
 

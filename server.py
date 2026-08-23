@@ -18,7 +18,7 @@ ROOT = Path(__file__).parent
 DB_PATH = ROOT / "survey.db"
 TIMEZONE = ZoneInfo("America/Argentina/Buenos_Aires")
 TIME_PATTERN = re.compile(r"^(?:[01]\d|2[0-3]):(?:00|05|10|15|20|25|30|35|40|45|50|55)$|^24:00$")
-ADMIN_PIN = os.environ.get("NOTIFICATION_ADMIN_PIN") or os.environ.get("VITE_ADMIN_PIN", "")
+ADMIN_PIN = os.environ.get("ADMIN_PIN") or os.environ.get("NOTIFICATION_ADMIN_PIN") or os.environ.get("VITE_ADMIN_PIN", "")
 DISCORD_WEBHOOK_URL = os.environ.get("DISCORD_WEBHOOK_URL", "")
 VOTERS = ["MISHA", "LEKU", "SEPIA", "ICHITBO"]
 

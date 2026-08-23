@@ -1,4 +1,4 @@
-import { existsSync } from "node:fs";
+import { existsSync, readFileSync } from "node:fs";
 import { spawn } from "node:child_process";
 import { join } from "node:path";
 
@@ -20,9 +20,34 @@ const pythonCandidates = [
   "py",
 ].filter(Boolean);
 
+function parseEnvFile(path) {
+  if (!existsSync(path)) return {};
+
+  return Object.fromEntries(
+    readFileSync(path, "utf8")
+      .split(/\r?\n/)
+      .map((line) => line.trim())
+      .filter((line) => line && !line.startsWith("#") && line.includes("="))
+      .map((line) => {
+        const separator = line.indexOf("=");
+        const key = line.slice(0, separator).trim();
+        const rawValue = line.slice(separator + 1).trim();
+        const value = rawValue.replace(/^['"]|['"]$/g, "");
+        return [key, value];
+      }),
+  );
+}
+
+const localEnv = parseEnvFile(join(root, ".env.local"));
+const childEnv = { ...process.env, ...localEnv };
+if (childEnv.ADMIN_PIN && !childEnv.VITE_ADMIN_PIN) {
+  childEnv.VITE_ADMIN_PIN = childEnv.ADMIN_PIN;
+}
+
 function run(command, args, label) {
   const child = spawn(command, args, {
     cwd: root,
+    env: childEnv,
     shell: command.endsWith(".cmd"),
     stdio: ["ignore", "pipe", "pipe"],
   });

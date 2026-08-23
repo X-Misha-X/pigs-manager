@@ -288,7 +288,7 @@ export default async function handler(request, response) {
     const body = await readJsonBody(request);
     const date = typeof body.date === "string" ? body.date : todayBuenosAires();
     const force = body.force === true;
-    const adminPin = process.env.NOTIFICATION_ADMIN_PIN || process.env.VITE_ADMIN_PIN;
+    const adminPin = process.env.ADMIN_PIN || process.env.NOTIFICATION_ADMIN_PIN || process.env.VITE_ADMIN_PIN;
     const rows = await supabaseRequest(`/votes?date=eq.${encodeURIComponent(date)}&select=*&order=voter.asc`);
     const votes = rows.map(voteFromRow);
     const votedKeys = new Set(votes.map((vote) => vote.voter.toLowerCase()));

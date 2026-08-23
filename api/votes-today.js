@@ -76,7 +76,7 @@ export default async function handler(request, response) {
   }
 
   try {
-    const adminPin = process.env.NOTIFICATION_ADMIN_PIN || process.env.VITE_ADMIN_PIN;
+    const adminPin = process.env.ADMIN_PIN || process.env.NOTIFICATION_ADMIN_PIN || process.env.VITE_ADMIN_PIN;
     const body = await readJsonBody(request);
 
     if (!adminPin || body.pin !== adminPin) {

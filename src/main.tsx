@@ -674,7 +674,7 @@ async function deleteTodayVotes(pin: string): Promise<Summary> {
 
   if (IS_DEV) {
     if (!ADMIN_PIN || pin !== ADMIN_PIN) {
-      throw new Error("PIN incorrecto. En local falta configurar VITE_ADMIN_PIN en .env.local o el PIN no coincide.");
+      throw new Error("PIN incorrecto. En local falta configurar ADMIN_PIN en .env.local o el PIN no coincide.");
     }
 
     const date = todayBuenosAires();
