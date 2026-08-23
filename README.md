@@ -50,6 +50,8 @@ NOTIFICATION_ADMIN_PIN=tu-pin-admin
 
 `DISCORD_WEBHOOK_URL`, `SUPABASE_SERVICE_ROLE_KEY` y `NOTIFICATION_ADMIN_PIN` son secretos del servidor: no deben tener prefijo `VITE_`.
 
+Para usar el panel `ADMIN` en local (`http://127.0.0.1:5173`), agregar tambien `VITE_ADMIN_PIN` en `.env.local`. El navegador local no lee las variables configuradas en Vercel.
+
 3. Ejecutar en Supabase el contenido actualizado de `supabase/schema.sql`.
 
 La notificacion se envia una sola vez por dia gracias a la tabla `notification_events`. Si falta configurar Discord, los votos se guardan igual y la app simplemente omite el aviso.

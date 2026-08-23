@@ -89,6 +89,7 @@ const API_BASE = import.meta.env.DEV ? "http://127.0.0.1:8000/api" : "/api";
 const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL as string | undefined;
 const SUPABASE_ANON_KEY = import.meta.env.VITE_SUPABASE_ANON_KEY as string | undefined;
 const ADMIN_PIN = import.meta.env.VITE_ADMIN_PIN as string | undefined;
+const IS_DEV = import.meta.env.DEV;
 const USE_SUPABASE = Boolean(SUPABASE_URL && SUPABASE_ANON_KEY);
 const VOTERS = ["MISHA", "LEKU", "SEPIA", "ICHITBO"];
 const VOTER_AVATARS: Record<string, string> = {
@@ -671,6 +672,21 @@ async function deleteTodayVotes(pin: string): Promise<Summary> {
     });
   }
 
+  if (IS_DEV) {
+    if (!ADMIN_PIN || pin !== ADMIN_PIN) {
+      throw new Error("PIN incorrecto. En local falta configurar VITE_ADMIN_PIN en .env.local o el PIN no coincide.");
+    }
+
+    const date = todayBuenosAires();
+    await supabaseRequest<undefined>(`/votes?date=eq.${date}`, {
+      method: "DELETE",
+      headers: {
+        Prefer: "return=minimal",
+      },
+    });
+    return loadAppSummary();
+  }
+
   await request<{ ok: boolean }>("/votes-today", {
     method: "DELETE",
     body: JSON.stringify({ pin }),
@@ -1133,7 +1149,7 @@ function App() {
 
   function unlockAdmin() {
     setAdminError("");
-    if (!USE_SUPABASE && (!ADMIN_PIN || adminPin !== ADMIN_PIN)) {
+    if ((IS_DEV || !USE_SUPABASE) && (!ADMIN_PIN || adminPin !== ADMIN_PIN)) {
       setAdminError("PIN incorrecto.");
       return;
     }
