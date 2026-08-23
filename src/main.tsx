@@ -1195,7 +1195,7 @@ function App() {
             <div className="topbar-inner">
               <div>
                 <p className="eyebrow">Pigs Manager</p>
-                <h1>POR UN GRUPO MEJOR</h1>
+                <h1>POR UN VICIO MEJOR</h1>
                 <div className="meta-row">
                   <span>
                     <CalendarDays size={16} />
