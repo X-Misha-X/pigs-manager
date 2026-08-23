@@ -1095,8 +1095,10 @@ function LoginScreen({
               <label htmlFor="login-admin-pin">PIN</label>
               <input
                 id="login-admin-pin"
-                inputMode="numeric"
                 type="password"
+                autoComplete="off"
+                autoCapitalize="none"
+                spellCheck={false}
                 value={adminPin}
                 onChange={(event) => onAdminPinChange(event.target.value)}
                 onKeyDown={(event) => {
@@ -1106,11 +1108,11 @@ function LoginScreen({
                 autoFocus
               />
               <div>
-                <button className="secondary-button" onClick={onAdminCancel}>
-                  CANCELAR
-                </button>
                 <button className="primary-button" onClick={onAdminUnlock}>
                   ENTRAR
+                </button>
+                <button className="secondary-button" onClick={onAdminCancel}>
+                  CANCELAR
                 </button>
               </div>
               {adminError ? <p className="error-text">{adminError}</p> : null}
@@ -1296,7 +1298,9 @@ function App() {
 
   function openAdminLogin() {
     resetVotingFlow();
+    setAdminUnlocked(false);
     setAdminOpen(true);
+    setAdminPin("");
     setAdminError("");
   }
 
@@ -1513,8 +1517,14 @@ function App() {
 
   function unlockAdmin() {
     setAdminError("");
-    if ((IS_DEV || !USE_SUPABASE) && (!ADMIN_PIN || adminPin !== ADMIN_PIN)) {
+    if (!ADMIN_PIN) {
+      setAdminError("PIN de admin no configurado.");
+      setAdminUnlocked(false);
+      return;
+    }
+    if (!adminPin.trim() || adminPin !== ADMIN_PIN) {
       setAdminError("PIN incorrecto.");
+      setAdminUnlocked(false);
       return;
     }
     setAdminUnlocked(true);
@@ -1849,8 +1859,10 @@ function AdminControls({
               <label htmlFor="admin-pin">PIN</label>
               <input
                 id="admin-pin"
-                inputMode="numeric"
                 type="password"
+                autoComplete="off"
+                autoCapitalize="none"
+                spellCheck={false}
                 value={adminPin}
                 onChange={(event) => onPinChange(event.target.value)}
               />
