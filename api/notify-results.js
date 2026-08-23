@@ -123,25 +123,28 @@ function voteFromRow(row) {
 function buildDiscordEmbed(date, votes, overlaps) {
   const voteLines = VOTERS.map((voter) => {
     const vote = votes.find((item) => item.voter.toLowerCase() === voter.toLowerCase());
-    if (!vote) return `▫️ **${voter}** todavía no votó`;
-    if (!vote.canPlay) return `❌ **${voter}** no puede jugar`;
-    if (!vote.ranges.length) return `⚠️ **${voter}** sin rangos`;
-    return `✅ **${voter}** ${vote.ranges.map(formatRange).join(", ")}`;
+    if (!vote) return `▫️ **${voter}**\nTodavía no votó`;
+    if (!vote.canPlay) return `❌ **${voter}**\nNo puede jugar`;
+    if (!vote.ranges.length) return `⚠️ **${voter}**\nSin rangos`;
+    return `✅ **${voter}**\n${vote.ranges.map(formatRange).join("\n")}`;
   });
   const overlapLines = overlaps.length
     ? overlaps
-        .slice(0, 5)
-        .map((overlap, index) => `${["🥇", "🥈", "🥉", "⭐", "⭐"][index]} **${formatRange(overlap)}**\n${overlap.voters.join(", ")}`)
+        .slice(0, 3)
+        .map((overlap, index) => `${["🥇", "🥈", "🥉"][index]} **${formatRange(overlap)}**\n${overlap.voters.join(", ")}`)
     : ["Sin coincidencias para todos por ahora."];
 
   return {
-    title: "🐷 Resultados Pigs Manager",
-    description: [`📅 ${formatDate(date)}`, `✅ Votaron **${votes.length}/${VOTERS.length}**`].join("\n"),
+    author: {
+      name: "Pigs Manager",
+    },
+    title: "Resultados del día",
+    description: [`📅 ${formatDate(date)}`, "", `✅ **${votes.length}/${VOTERS.length} confirmaron**`].join("\n"),
     color: 0xff4fa3,
     fields: [
       {
         name: "🗳️ Votos",
-        value: voteLines.join("\n"),
+        value: voteLines.join("\n\n"),
         inline: false,
       },
       {
@@ -150,9 +153,6 @@ function buildDiscordEmbed(date, votes, overlaps) {
         inline: false,
       },
     ],
-    footer: {
-      text: "Por un VICIO mejor",
-    },
   };
 }
 
@@ -329,7 +329,7 @@ export default async function handler(request, response) {
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
         username: "Pigs Manager",
-        content: "🐷 Ya votaron todos. Estos son los resultados:",
+        content: "🐷 Ya votaron todos.",
         embeds: [buildDiscordEmbed(date, votes, overlaps)],
       }),
     });

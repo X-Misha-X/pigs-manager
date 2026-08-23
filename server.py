@@ -206,33 +206,33 @@ def build_discord_embed(date: str, votes: list[dict[str, Any]], overlaps: list[d
     for voter in VOTERS:
         vote = next((item for item in votes if item["voter"].lower() == voter.lower()), None)
         if not vote:
-            vote_lines.append(f"▫️ **{voter}** todavía no votó")
+            vote_lines.append(f"▫️ **{voter}**\nTodavía no votó")
         elif not vote["canPlay"]:
-            vote_lines.append(f"❌ **{voter}** no puede jugar")
+            vote_lines.append(f"❌ **{voter}**\nNo puede jugar")
         elif not vote["ranges"]:
-            vote_lines.append(f"⚠️ **{voter}** sin rangos")
+            vote_lines.append(f"⚠️ **{voter}**\nSin rangos")
         else:
-            ranges = ", ".join(f'{item["start"]} hs a {item["end"]} hs' for item in vote["ranges"])
-            vote_lines.append(f"✅ **{voter}** {ranges}")
+            ranges = "\n".join(f'{item["start"]} hs a {item["end"]} hs' for item in vote["ranges"])
+            vote_lines.append(f"✅ **{voter}**\n{ranges}")
 
     overlap_lines = (
         [
             f'{["🥇", "🥈", "🥉", "⭐", "⭐"][index]} **{overlap["start"]} hs a {overlap["end"]} hs**\n{", ".join(overlap["voters"])}'
-            for index, overlap in enumerate(overlaps[:5])
+            for index, overlap in enumerate(overlaps[:3])
         ]
         if overlaps
         else ["Sin coincidencias para todos por ahora."]
     )
 
     return {
-        "title": "🐷 Resultados Pigs Manager",
-        "description": f"📅 {date}\n✅ Votaron **{len(votes)}/{len(VOTERS)}**",
+        "author": {"name": "Pigs Manager"},
+        "title": "Resultados del día",
+        "description": f"📅 {date}\n\n✅ **{len(votes)}/{len(VOTERS)} confirmaron**",
         "color": 0xFF4FA3,
         "fields": [
-            {"name": "🗳️ Votos", "value": "\n".join(vote_lines), "inline": False},
+            {"name": "🗳️ Votos", "value": "\n\n".join(vote_lines), "inline": False},
             {"name": "🎯 Coincidencias", "value": "\n\n".join(overlap_lines), "inline": False},
         ],
-        "footer": {"text": "Por un VICIO mejor"},
     }
 
 
@@ -316,7 +316,7 @@ def notify_discord_if_complete(date: str | None = None, force: bool = False, pin
     payload = json.dumps(
         {
             "username": "Pigs Manager",
-            "content": "🐷 Ya votaron todos. Estos son los resultados:",
+            "content": "🐷 Ya votaron todos.",
             "embeds": [build_discord_embed(target_date, votes, overlaps)],
         },
         ensure_ascii=False,

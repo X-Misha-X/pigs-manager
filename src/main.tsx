@@ -207,8 +207,6 @@ function buildResultsMessage(summary: Summary) {
     "",
     "🎯 *Coincidencias*",
     ...overlapLines,
-    "",
-    "_Por un VICIO mejor_",
   ].join("\n");
 }
 
