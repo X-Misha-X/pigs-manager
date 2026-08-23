@@ -298,7 +298,7 @@ def notification_diagnostics(date: str | None = None) -> dict[str, Any]:
     }
 
 
-def notify_discord_if_complete(date: str | None = None) -> dict[str, Any]:
+def notify_discord_if_complete(date: str | None = None, force: bool = False, pin: str | None = None) -> dict[str, Any]:
     if not DISCORD_WEBHOOK_URL:
         return {"ok": True, "skipped": True, "reason": "Discord no esta configurado."}
 
@@ -308,8 +308,12 @@ def notify_discord_if_complete(date: str | None = None) -> dict[str, Any]:
     if any(voter.lower() not in voted_keys for voter in VOTERS):
         return {"ok": True, "skipped": True, "reason": "Todavia faltan votos."}
 
-    if not mark_notification_pending(target_date):
+    if get_notification_status(target_date) and not force:
         return {"ok": True, "skipped": True, "reason": "Los resultados ya fueron enviados."}
+    if force:
+        if not ADMIN_PIN or pin != ADMIN_PIN:
+            return {"error": "PIN incorrecto."}
+        delete_notification_mark(target_date)
 
     overlaps = calculate_overlaps(votes)
     payload = json.dumps(
@@ -328,12 +332,11 @@ def notify_discord_if_complete(date: str | None = None) -> dict[str, Any]:
     try:
         with urllib.request.urlopen(request, timeout=8) as discord_response:
             if discord_response.status >= 400:
-                delete_notification_mark(target_date)
                 return {"error": "Discord no acepto la notificacion."}
     except (urllib.error.URLError, TimeoutError):
-        delete_notification_mark(target_date)
         return {"error": "No se pudo conectar con Discord."}
 
+    mark_notification_pending(target_date)
     return {"ok": True, "notified": True}
 
 
@@ -356,7 +359,11 @@ class SurveyHandler(BaseHTTPRequestHandler):
         if self.path == "/api/notify-results":
             try:
                 payload = self.read_json()
-                result = notify_discord_if_complete(payload.get("date"))
+                result = notify_discord_if_complete(
+                    payload.get("date"),
+                    force=payload.get("force") is True,
+                    pin=payload.get("pin"),
+                )
                 self.send_json(result, status=200 if result.get("ok") else 502)
             except json.JSONDecodeError:
                 self.send_json({"error": "El cuerpo de la solicitud no es JSON valido."}, status=400)

@@ -287,6 +287,8 @@ export default async function handler(request, response) {
   try {
     const body = await readJsonBody(request);
     const date = typeof body.date === "string" ? body.date : todayBuenosAires();
+    const force = body.force === true;
+    const adminPin = process.env.NOTIFICATION_ADMIN_PIN || process.env.VITE_ADMIN_PIN;
     const rows = await supabaseRequest(`/votes?date=eq.${encodeURIComponent(date)}&select=*&order=voter.asc`);
     const votes = rows.map(voteFromRow);
     const votedKeys = new Set(votes.map((vote) => vote.voter.toLowerCase()));
@@ -297,10 +299,17 @@ export default async function handler(request, response) {
       return;
     }
 
-    const shouldNotify = await markNotificationPending(date);
-    if (!shouldNotify) {
+    const previousNotification = await getNotificationStatus(date);
+    if (previousNotification && !force) {
       response.status(200).json({ ok: true, skipped: true, reason: "Los resultados ya fueron enviados." });
       return;
+    }
+    if (force) {
+      if (!adminPin || body.pin !== adminPin) {
+        response.status(403).json({ error: "PIN incorrecto." });
+        return;
+      }
+      await deleteNotificationMark(date);
     }
 
     const overlaps = calculateOverlaps(votes);
@@ -314,11 +323,11 @@ export default async function handler(request, response) {
     });
 
     if (!discordResponse.ok) {
-      await deleteNotificationMark(date);
       response.status(502).json({ error: "Discord no acepto la notificacion." });
       return;
     }
 
+    await markNotificationPending(date);
     response.status(200).json({ ok: true, notified: true });
   } catch (error) {
     response.status(500).json({ error: error instanceof Error ? error.message : "No se pudo enviar la notificacion." });
