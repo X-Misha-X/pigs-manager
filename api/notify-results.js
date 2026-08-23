@@ -133,7 +133,7 @@ function buildDiscordMessage(date, votes, overlaps) {
     : ["Sin coincidencias para todos por ahora."];
 
   return [
-    `**Resultados Vicio Manager - ${formatDate(date)}**`,
+    `**Resultados Pigs Manager - ${formatDate(date)}**`,
     "",
     `Votaron ${votes.length}/${VOTERS.length}.`,
     "",
@@ -317,7 +317,7 @@ export default async function handler(request, response) {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
-        username: "Vicio Manager",
+        username: "Pigs Manager",
         content: buildDiscordMessage(date, votes, overlaps),
       }),
     });

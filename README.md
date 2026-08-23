@@ -1,4 +1,4 @@
-# Vicio Manager
+# Pigs Manager
 
 App para votar si hoy se juega y cargar rangos horarios en formato 24 hs.
 
@@ -64,7 +64,7 @@ En "Resultados del dia" hay un boton `WHATSAPP` que abre un mensaje prearmado co
 
 1. Subir el repo a GitHub.
 2. Importar el repo en Vercel.
-3. Configurar el nombre deseado: `vicio-manager`.
+3. Configurar el nombre deseado: `pigs-manager`.
 4. Agregar las variables de entorno de Supabase en Vercel:
    - `VITE_SUPABASE_URL`
    - `VITE_SUPABASE_ANON_KEY`
@@ -75,7 +75,7 @@ En "Resultados del dia" hay un boton `WHATSAPP` que abre un mensaje prearmado co
 La URL esperada es:
 
 ```text
-https://vicio-manager.vercel.app
+https://pigs-manager.vercel.app
 ```
 
 Si el nombre no esta disponible, Vercel va a pedir una variante.

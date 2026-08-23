@@ -98,7 +98,7 @@ const VOTER_AVATARS: Record<string, string> = {
   SEPIA: "/avatars/sepia.png",
   ICHITBO: "/avatars/ichitbo.png",
 };
-const GAMES_STORAGE_KEY = "chupapig-manager-games";
+const GAMES_STORAGE_KEY = "pigs-manager-games";
 const MINUTES = Array.from({ length: 12 }, (_, index) => String(index * 5).padStart(2, "0"));
 const HOURS = Array.from({ length: 24 }, (_, index) => String(index).padStart(2, "0"));
 const END_HOURS = [...HOURS, "24"];
@@ -195,7 +195,7 @@ function buildResultsMessage(summary: Summary) {
     : ["Sin coincidencias por ahora."];
 
   return [
-    `Resultados Vicio Manager - ${formatDate(summary.date)}`,
+    `Resultados Pigs Manager - ${formatDate(summary.date)}`,
     "",
     `Confirmaron ${summary.votes.length}/${VOTERS.length}`,
     "",
@@ -1194,8 +1194,8 @@ function App() {
           <header className="topbar">
             <div className="topbar-inner">
               <div>
-                <p className="eyebrow">Chupapig manager</p>
-                <h1>POR UN VICIO MEJOR</h1>
+                <p className="eyebrow">Pigs Manager</p>
+                <h1>POR UN GRUPO MEJOR</h1>
                 <div className="meta-row">
                   <span>
                     <CalendarDays size={16} />
@@ -1234,7 +1234,7 @@ function App() {
               <span>
                 <UserRound size={15} />
               </span>
-              CHUPAPIG QUE VOTA:
+              PIG QUE VOTA:
             </h2>
             <div className="voter-grid">
               {VOTERS.map((name) => (

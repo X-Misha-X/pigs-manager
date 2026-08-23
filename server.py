@@ -226,7 +226,7 @@ def build_results_message(date: str, votes: list[dict[str, Any]], overlaps: list
 
     return "\n".join(
         [
-            f"**Resultados Vicio Manager - {date}**",
+            f"**Resultados Pigs Manager - {date}**",
             "",
             f"Votaron {len(votes)}/{len(VOTERS)}.",
             "",
@@ -318,7 +318,7 @@ def notify_discord_if_complete(date: str | None = None, force: bool = False, pin
     overlaps = calculate_overlaps(votes)
     payload = json.dumps(
         {
-            "username": "Vicio Manager",
+            "username": "Pigs Manager",
             "content": build_results_message(target_date, votes, overlaps),
         }
     ).encode("utf-8")
