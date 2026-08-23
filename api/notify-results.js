@@ -42,6 +42,14 @@ function formatRange(range) {
   return `${range.start} hs a ${end}`;
 }
 
+const DISCORD_EMOJI = {
+  calendar: String.fromCodePoint(0x1f4c5),
+  check: String.fromCodePoint(0x2705),
+  trophy: String.fromCodePoint(0x1f3c6),
+  medals: [String.fromCodePoint(0x1f947), String.fromCodePoint(0x1f948), String.fromCodePoint(0x1f949)],
+  star: String.fromCodePoint(0x2b50),
+};
+
 function combinations(items, size) {
   if (size === 0) return [[]];
   if (items.length < size) return [];
@@ -121,17 +129,13 @@ function voteFromRow(row) {
 }
 
 function buildDiscordEmbed(date, votes, overlaps) {
-  const voteLines = VOTERS.map((voter) => {
-    const vote = votes.find((item) => item.voter.toLowerCase() === voter.toLowerCase());
-    if (!vote) return `▫️ **${voter}**\nTodavía no votó`;
-    if (!vote.canPlay) return `❌ **${voter}**\nNo puede jugar`;
-    if (!vote.ranges.length) return `⚠️ **${voter}**\nSin rangos`;
-    return `✅ **${voter}**\n${vote.ranges.map(formatRange).join("\n")}`;
-  });
   const overlapLines = overlaps.length
     ? overlaps
-        .slice(0, 3)
-        .map((overlap, index) => `${["🥇", "🥈", "🥉"][index]} **${formatRange(overlap)}**\n${overlap.voters.join(", ")}`)
+        .slice(0, 5)
+        .map((overlap, index) => {
+          const rank = DISCORD_EMOJI.medals[index] ?? DISCORD_EMOJI.star;
+          return `${rank} **${formatRange(overlap)}**\n${overlap.voters.join(", ")}`;
+        })
     : ["Sin coincidencias para todos por ahora."];
 
   return {
@@ -139,16 +143,15 @@ function buildDiscordEmbed(date, votes, overlaps) {
       name: "Pigs Manager",
     },
     title: "Resultados del día",
-    description: [`📅 ${formatDate(date)}`, "", `✅ **${votes.length}/${VOTERS.length} confirmaron**`].join("\n"),
+    description: [
+      `${DISCORD_EMOJI.calendar} ${formatDate(date)}`,
+      "",
+      `${DISCORD_EMOJI.check} **${votes.length}/${VOTERS.length} confirmaron**`,
+    ].join("\n"),
     color: 0xff4fa3,
     fields: [
       {
-        name: "🗳️ Votos",
-        value: voteLines.join("\n\n"),
-        inline: false,
-      },
-      {
-        name: "TOP MATCHES",
+        name: `${DISCORD_EMOJI.trophy} TOP MATCHES`,
         value: overlapLines.join("\n\n"),
         inline: false,
       },

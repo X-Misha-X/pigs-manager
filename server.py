@@ -21,6 +21,13 @@ TIME_PATTERN = re.compile(r"^(?:[01]\d|2[0-3]):(?:00|05|10|15|20|25|30|35|40|45|
 ADMIN_PIN = os.environ.get("ADMIN_PIN") or os.environ.get("NOTIFICATION_ADMIN_PIN") or os.environ.get("VITE_ADMIN_PIN", "")
 DISCORD_WEBHOOK_URL = os.environ.get("DISCORD_WEBHOOK_URL", "")
 VOTERS = ["MISHA", "LEKU", "SEPIA", "ICHITBO"]
+DISCORD_EMOJI = {
+    "calendar": chr(0x1F4C5),
+    "check": chr(0x2705),
+    "trophy": chr(0x1F3C6),
+    "medals": [chr(0x1F947), chr(0x1F948), chr(0x1F949)],
+    "star": chr(0x2B50),
+}
 
 
 def today_buenos_aires() -> str:
@@ -202,23 +209,11 @@ def summary() -> dict[str, Any]:
 
 
 def build_discord_embed(date: str, votes: list[dict[str, Any]], overlaps: list[dict[str, Any]]) -> dict[str, Any]:
-    vote_lines = []
-    for voter in VOTERS:
-        vote = next((item for item in votes if item["voter"].lower() == voter.lower()), None)
-        if not vote:
-            vote_lines.append(f"▫️ **{voter}**\nTodavía no votó")
-        elif not vote["canPlay"]:
-            vote_lines.append(f"❌ **{voter}**\nNo puede jugar")
-        elif not vote["ranges"]:
-            vote_lines.append(f"⚠️ **{voter}**\nSin rangos")
-        else:
-            ranges = "\n".join(f'{item["start"]} hs a {item["end"]} hs' for item in vote["ranges"])
-            vote_lines.append(f"✅ **{voter}**\n{ranges}")
-
     overlap_lines = (
         [
-            f'{["🥇", "🥈", "🥉", "⭐", "⭐"][index]} **{overlap["start"]} hs a {overlap["end"]} hs**\n{", ".join(overlap["voters"])}'
-            for index, overlap in enumerate(overlaps[:3])
+            f'{(DISCORD_EMOJI["medals"][index] if index < len(DISCORD_EMOJI["medals"]) else DISCORD_EMOJI["star"])} '
+            f'**{overlap["start"]} hs a {overlap["end"]} hs**\n{", ".join(overlap["voters"])}'
+            for index, overlap in enumerate(overlaps[:5])
         ]
         if overlaps
         else ["Sin coincidencias para todos por ahora."]
@@ -227,11 +222,10 @@ def build_discord_embed(date: str, votes: list[dict[str, Any]], overlaps: list[d
     return {
         "author": {"name": "Pigs Manager"},
         "title": "Resultados del día",
-        "description": f"📅 {date}\n\n✅ **{len(votes)}/{len(VOTERS)} confirmaron**",
+        "description": f'{DISCORD_EMOJI["calendar"]} {date}\n\n{DISCORD_EMOJI["check"]} **{len(votes)}/{len(VOTERS)} confirmaron**',
         "color": 0xFF4FA3,
         "fields": [
-            {"name": "🗳️ Votos", "value": "\n\n".join(vote_lines), "inline": False},
-            {"name": "TOP MATCHES", "value": "\n\n".join(overlap_lines), "inline": False},
+            {"name": f'{DISCORD_EMOJI["trophy"]} TOP MATCHES', "value": "\n\n".join(overlap_lines), "inline": False},
         ],
     }
 
