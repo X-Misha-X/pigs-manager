@@ -120,29 +120,40 @@ function voteFromRow(row) {
   };
 }
 
-function buildDiscordMessage(date, votes, overlaps) {
+function buildDiscordEmbed(date, votes, overlaps) {
   const voteLines = VOTERS.map((voter) => {
     const vote = votes.find((item) => item.voter.toLowerCase() === voter.toLowerCase());
-    if (!vote) return `- ${voter}: sin votar`;
-    if (!vote.canPlay) return `- ${voter}: no puede jugar`;
-    if (!vote.ranges.length) return `- ${voter}: sin rangos`;
-    return `- ${voter}: ${vote.ranges.map(formatRange).join(", ")}`;
+    if (!vote) return `▫️ **${voter}** todavía no votó`;
+    if (!vote.canPlay) return `❌ **${voter}** no puede jugar`;
+    if (!vote.ranges.length) return `⚠️ **${voter}** sin rangos`;
+    return `✅ **${voter}** ${vote.ranges.map(formatRange).join(", ")}`;
   });
   const overlapLines = overlaps.length
-    ? overlaps.slice(0, 5).map((overlap, index) => `${index + 1}. ${formatRange(overlap)} (${overlap.voters.join(", ")})`)
+    ? overlaps
+        .slice(0, 5)
+        .map((overlap, index) => `${["🥇", "🥈", "🥉", "⭐", "⭐"][index]} **${formatRange(overlap)}**\n${overlap.voters.join(", ")}`)
     : ["Sin coincidencias para todos por ahora."];
 
-  return [
-    `**Resultados Pigs Manager - ${formatDate(date)}**`,
-    "",
-    `Votaron ${votes.length}/${VOTERS.length}.`,
-    "",
-    "**Votos**",
-    ...voteLines,
-    "",
-    "**Coincidencias**",
-    ...overlapLines,
-  ].join("\n");
+  return {
+    title: "🐷 Resultados Pigs Manager",
+    description: [`📅 ${formatDate(date)}`, `✅ Votaron **${votes.length}/${VOTERS.length}**`].join("\n"),
+    color: 0xff4fa3,
+    fields: [
+      {
+        name: "🗳️ Votos",
+        value: voteLines.join("\n"),
+        inline: false,
+      },
+      {
+        name: "🎯 Coincidencias",
+        value: overlapLines.join("\n\n"),
+        inline: false,
+      },
+    ],
+    footer: {
+      text: "Por un VICIO mejor",
+    },
+  };
 }
 
 async function supabaseRequest(path, options = {}) {
@@ -318,7 +329,8 @@ export default async function handler(request, response) {
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
         username: "Pigs Manager",
-        content: buildDiscordMessage(date, votes, overlaps),
+        content: "🐷 Ya votaron todos. Estos son los resultados:",
+        embeds: [buildDiscordEmbed(date, votes, overlaps)],
       }),
     });
 
