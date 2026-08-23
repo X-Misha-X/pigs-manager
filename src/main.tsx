@@ -4,6 +4,7 @@ import {
   CalendarDays,
   Check,
   Loader2,
+  MessageCircle,
   Pencil,
   Plus,
   RotateCcw,
@@ -178,6 +179,31 @@ function minutesToRangeEnd(value: number) {
 function formatRange(range: Pick<Range, "start" | "end">) {
   const end = isOvernightTime(range.end) ? OVERNIGHT_TIME : `${range.end} hs`;
   return `${range.start} hs a ${end}`;
+}
+
+function buildResultsMessage(summary: Summary) {
+  const voteLines = VOTERS.map((voter) => {
+    const vote = summary.votes.find((item) => item.voter.toLowerCase() === voter.toLowerCase());
+    if (!vote) return `- ${voter}: sin votar`;
+    if (!vote.canPlay) return `- ${voter}: no puede jugar`;
+    if (!vote.ranges.length) return `- ${voter}: sin rangos`;
+    return `- ${voter}: ${vote.ranges.map(formatRange).join(", ")}`;
+  });
+  const overlapLines = summary.overlaps.length
+    ? summary.overlaps.slice(0, 5).map((overlap, index) => `${index + 1}. ${formatRange(overlap)} (${overlap.voters.join(", ")})`)
+    : ["Sin coincidencias por ahora."];
+
+  return [
+    `Resultados Vicio Manager - ${formatDate(summary.date)}`,
+    "",
+    `Confirmaron ${summary.votes.length}/${VOTERS.length}`,
+    "",
+    "Votos:",
+    ...voteLines,
+    "",
+    "Coincidencias:",
+    ...overlapLines,
+  ].join("\n");
 }
 
 function normalizeRange(range: Range): Range {
@@ -500,6 +526,34 @@ async function saveAppVote(voter: string, canPlay: boolean, ranges: Range[], com
   return loadAppSummary();
 }
 
+type NotificationResult = {
+  ok?: boolean;
+  notified?: boolean;
+  skipped?: boolean;
+  reason?: string;
+  error?: string;
+};
+
+async function notifyResultsIfComplete(summary: Summary): Promise<NotificationResult | null> {
+  if (summary.votes.length < VOTERS.length) return null;
+
+  try {
+    const response = await fetch("/api/notify-results", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ date: summary.date }),
+    });
+    const result = (await response.json().catch(() => ({}))) as NotificationResult;
+    if (!response.ok || result.error) {
+      return { ok: false, error: result.error ?? "Discord no pudo enviar la notificacion." };
+    }
+    return result;
+  } catch (error) {
+    console.warn("No se pudo avisar los resultados por Discord.", error);
+    return { ok: false, error: "No se pudo conectar con el endpoint de Discord." };
+  }
+}
+
 async function deleteAppVote(voter: string): Promise<Summary> {
   if (!USE_SUPABASE) {
     return saveAppVote(voter, true, [], "");
@@ -668,6 +722,7 @@ function App() {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
+  const [notificationNotice, setNotificationNotice] = useState("");
   const [dialModes, setDialModes] = useState<DialModes>({});
   const [activeRangeFields, setActiveRangeFields] = useState<ActiveRangeFields>({});
   const [collapsedRanges, setCollapsedRanges] = useState<CollapsedRanges>({});
@@ -792,6 +847,7 @@ function App() {
     resetVotingFlow();
     setPendingVoterName(name);
     setError("");
+    setNotificationNotice("");
   }
 
   function confirmVoter() {
@@ -1018,6 +1074,7 @@ function App() {
 
     setSaving(true);
     setError("");
+    setNotificationNotice("");
     try {
       const usableRanges = canPlay ? ranges.filter(isActiveRange).map(({ start, end }) => ({ start, end })) : [];
       if (canPlay && !usableRanges.length) {
@@ -1040,6 +1097,14 @@ function App() {
       }
       const savedSummary = await saveAppVote(voterName, canPlay, usableRanges, comment.trim());
       setSummary(savedSummary);
+      const notificationResult = await notifyResultsIfComplete(savedSummary);
+      if (notificationResult?.notified) {
+        setNotificationNotice("Voto guardado y resultados enviados a Discord.");
+      } else if (notificationResult?.skipped) {
+        setNotificationNotice(`Voto guardado. Discord no envio aviso: ${notificationResult.reason}`);
+      } else if (notificationResult?.error) {
+        setNotificationNotice(`Voto guardado. Discord fallo: ${notificationResult.error}`);
+      }
       resetVotingFlow({ keepVoter: true });
     } catch (err) {
       setError(err instanceof Error ? err.message : "No se pudo guardar tu voto");
@@ -1113,6 +1178,12 @@ function App() {
     Boolean(voterName) &&
     canPlay !== null &&
     (canPlay === false || ranges.some(isActiveCompleteRange) || (Boolean(currentVote) && hasPendingDeletedSavedRanges));
+
+  function shareResultsOnWhatsapp() {
+    if (!summary) return;
+    const message = buildResultsMessage(summary);
+    window.open(`https://wa.me/?text=${encodeURIComponent(message)}`, "_blank", "noopener,noreferrer");
+  }
 
   return (
     <main className="app-shell">
@@ -1264,6 +1335,7 @@ function App() {
                   ) : null}
 
                   {error ? <p className="error-text">{error}</p> : null}
+                  {notificationNotice ? <p className="info-text">{notificationNotice}</p> : null}
 
                   {voterName && canPlay !== null ? (
                     <>
@@ -1290,7 +1362,13 @@ function App() {
                 <div className="panel">
                   <div className="section-heading">
                     <h2 className="panel-title">RESULTADOS DEL DIA</h2>
-                    <span>{summary?.votes.length ?? 0} confirmaron</span>
+                    <div className="result-actions">
+                      <span>{summary?.votes.length ?? 0} confirmaron</span>
+                      <button className="secondary-button share-results-button" onClick={shareResultsOnWhatsapp} disabled={!summary || !summary.votes.length}>
+                        <MessageCircle size={16} />
+                        WHATSAPP
+                      </button>
+                    </div>
                   </div>
                   {summary?.suggestions?.length ? (
                     <div className="range-suggestions">

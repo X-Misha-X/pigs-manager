@@ -60,6 +60,18 @@ begin
   end if;
 end $$;
 
+create table if not exists public.notification_events (
+  event_key text primary key,
+  date date not null,
+  channel text not null,
+  created_at timestamptz not null default now(),
+  constraint notification_events_channel_not_blank check (length(trim(channel)) > 0)
+);
+
+create index if not exists notification_events_date_idx on public.notification_events (date desc);
+
+alter table public.notification_events enable row level security;
+
 create table if not exists public.games (
   id uuid primary key default gen_random_uuid(),
   name text not null,

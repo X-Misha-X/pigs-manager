@@ -4,6 +4,8 @@ import json
 import os
 import re
 import sqlite3
+import urllib.error
+import urllib.request
 from datetime import datetime
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from itertools import combinations
@@ -17,6 +19,8 @@ DB_PATH = ROOT / "survey.db"
 TIMEZONE = ZoneInfo("America/Argentina/Buenos_Aires")
 TIME_PATTERN = re.compile(r"^(?:[01]\d|2[0-3]):(?:00|05|10|15|20|25|30|35|40|45|50|55)$|^24:00$")
 ADMIN_PIN = os.environ.get("VITE_ADMIN_PIN", "")
+DISCORD_WEBHOOK_URL = os.environ.get("DISCORD_WEBHOOK_URL", "")
+VOTERS = ["MISHA", "LEKU", "SEPIA", "ICHITBO"]
 
 
 def today_buenos_aires() -> str:
@@ -91,6 +95,16 @@ def init_db() -> None:
         columns = [row["name"] for row in db.execute("PRAGMA table_info(votes)").fetchall()]
         if "comment" not in columns:
             db.execute("ALTER TABLE votes ADD COLUMN comment TEXT NOT NULL DEFAULT ''")
+        db.execute(
+            """
+            CREATE TABLE IF NOT EXISTS notification_events (
+                event_key TEXT PRIMARY KEY,
+                date TEXT NOT NULL,
+                channel TEXT NOT NULL,
+                created_at TEXT NOT NULL
+            )
+            """
+        )
 
 
 def get_votes(date: str) -> list[dict[str, Any]]:
@@ -187,6 +201,142 @@ def summary() -> dict[str, Any]:
     }
 
 
+def build_results_message(date: str, votes: list[dict[str, Any]], overlaps: list[dict[str, Any]]) -> str:
+    vote_lines = []
+    for voter in VOTERS:
+        vote = next((item for item in votes if item["voter"].lower() == voter.lower()), None)
+        if not vote:
+            vote_lines.append(f"- {voter}: sin votar")
+        elif not vote["canPlay"]:
+            vote_lines.append(f"- {voter}: no puede jugar")
+        elif not vote["ranges"]:
+            vote_lines.append(f"- {voter}: sin rangos")
+        else:
+            ranges = ", ".join(f'{item["start"]} hs a {item["end"]} hs' for item in vote["ranges"])
+            vote_lines.append(f"- {voter}: {ranges}")
+
+    overlap_lines = (
+        [
+            f'{index + 1}. {overlap["start"]} hs a {overlap["end"]} hs ({", ".join(overlap["voters"])})'
+            for index, overlap in enumerate(overlaps[:5])
+        ]
+        if overlaps
+        else ["Sin coincidencias para todos por ahora."]
+    )
+
+    return "\n".join(
+        [
+            f"**Resultados Vicio Manager - {date}**",
+            "",
+            f"Votaron {len(votes)}/{len(VOTERS)}.",
+            "",
+            "**Votos**",
+            *vote_lines,
+            "",
+            "**Coincidencias**",
+            *overlap_lines,
+        ]
+    )
+
+
+def mark_notification_pending(date: str) -> bool:
+    event_key = f"today-results:{date}"
+    try:
+        with connect() as db:
+            db.execute(
+                """
+                INSERT INTO notification_events (event_key, date, channel, created_at)
+                VALUES (?, ?, ?, ?)
+                """,
+                (event_key, date, "discord", now_buenos_aires()),
+            )
+        return True
+    except sqlite3.IntegrityError:
+        return False
+
+
+def delete_notification_mark(date: str) -> None:
+    with connect() as db:
+        db.execute("DELETE FROM notification_events WHERE event_key = ?", (f"today-results:{date}",))
+
+
+def get_notification_status(date: str) -> dict[str, Any] | None:
+    with connect() as db:
+        row = db.execute(
+            """
+            SELECT event_key, created_at
+            FROM notification_events
+            WHERE event_key = ?
+            LIMIT 1
+            """,
+            (f"today-results:{date}",),
+        ).fetchone()
+
+    return dict(row) if row else None
+
+
+def notification_diagnostics(date: str | None = None) -> dict[str, Any]:
+    target_date = date or today_buenos_aires()
+    votes = get_votes(target_date)
+    voted_keys = {vote["voter"].lower() for vote in votes}
+    missing_voters = [voter for voter in VOTERS if voter.lower() not in voted_keys]
+    notification = get_notification_status(target_date)
+
+    return {
+        "ok": True,
+        "date": target_date,
+        "configured": {
+            "discordWebhook": bool(DISCORD_WEBHOOK_URL),
+            "supabaseUrl": False,
+            "supabaseServiceRole": False,
+        },
+        "voteCount": len(votes),
+        "expectedVoteCount": len(VOTERS),
+        "missingVoters": missing_voters,
+        "notificationSent": bool(notification),
+        "notificationCreatedAt": notification["created_at"] if notification else None,
+    }
+
+
+def notify_discord_if_complete(date: str | None = None) -> dict[str, Any]:
+    if not DISCORD_WEBHOOK_URL:
+        return {"ok": True, "skipped": True, "reason": "Discord no esta configurado."}
+
+    target_date = date or today_buenos_aires()
+    votes = get_votes(target_date)
+    voted_keys = {vote["voter"].lower() for vote in votes}
+    if any(voter.lower() not in voted_keys for voter in VOTERS):
+        return {"ok": True, "skipped": True, "reason": "Todavia faltan votos."}
+
+    if not mark_notification_pending(target_date):
+        return {"ok": True, "skipped": True, "reason": "Los resultados ya fueron enviados."}
+
+    overlaps = calculate_overlaps(votes)
+    payload = json.dumps(
+        {
+            "username": "Vicio Manager",
+            "content": build_results_message(target_date, votes, overlaps),
+        }
+    ).encode("utf-8")
+    request = urllib.request.Request(
+        DISCORD_WEBHOOK_URL,
+        data=payload,
+        headers={"Content-Type": "application/json"},
+        method="POST",
+    )
+
+    try:
+        with urllib.request.urlopen(request, timeout=8) as discord_response:
+            if discord_response.status >= 400:
+                delete_notification_mark(target_date)
+                return {"error": "Discord no acepto la notificacion."}
+    except (urllib.error.URLError, TimeoutError):
+        delete_notification_mark(target_date)
+        return {"error": "No se pudo conectar con Discord."}
+
+    return {"ok": True, "notified": True}
+
+
 class SurveyHandler(BaseHTTPRequestHandler):
     def do_OPTIONS(self) -> None:
         self.send_response(204)
@@ -197,9 +347,21 @@ class SurveyHandler(BaseHTTPRequestHandler):
         if self.path == "/api/summary":
             self.send_json(summary())
             return
+        if self.path.startswith("/api/notify-results"):
+            self.send_json(notification_diagnostics())
+            return
         self.send_error(404)
 
     def do_POST(self) -> None:
+        if self.path == "/api/notify-results":
+            try:
+                payload = self.read_json()
+                result = notify_discord_if_complete(payload.get("date"))
+                self.send_json(result, status=200 if result.get("ok") else 502)
+            except json.JSONDecodeError:
+                self.send_json({"error": "El cuerpo de la solicitud no es JSON valido."}, status=400)
+            return
+
         if self.path != "/api/votes":
             self.send_error(404)
             return
