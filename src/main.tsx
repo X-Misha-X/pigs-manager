@@ -1578,8 +1578,8 @@ function App() {
             </span>
             <button className="secondary-button share-results-button" onClick={shareResultsOnWhatsapp} disabled={!summary || !summary.votes.length}>
               <Share2 size={15} />
+              <span>COMPARTIR RESULTADOS</span>
               <WhatsappIcon size={16} />
-              COMPARTIR RESULTADOS
             </button>
           </div>
 

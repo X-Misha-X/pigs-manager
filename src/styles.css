@@ -773,14 +773,20 @@ button {
 
   .app-layout {
     @apply px-3 pb-6 pt-3;
+    max-width: none;
+    width: 100%;
   }
 
   .topbar-inner {
-    @apply gap-3 pb-4;
+    @apply flex-row items-start justify-between gap-3 pb-4;
   }
 
   .topbar h1 {
     @apply mt-3 pl-0 text-sm leading-snug;
+  }
+
+  .topbar > div:first-child {
+    @apply min-w-0;
   }
 
   .eyebrow {
@@ -790,7 +796,7 @@ button {
   }
 
   .session-actions {
-    @apply mr-0 w-full justify-start;
+    @apply mr-0 w-auto shrink-0 justify-end;
   }
 
   .user-menu,
@@ -799,12 +805,16 @@ button {
   }
 
   .user-menu-trigger {
-    @apply h-12 px-3 text-sm;
+    @apply h-12 w-12 px-0 text-sm;
   }
 
   .header-user-avatar,
   .header-admin-avatar {
     @apply h-9 w-9;
+  }
+
+  .user-menu-trigger > span {
+    @apply sr-only;
   }
 
   .screen-meta-row {
@@ -823,14 +833,24 @@ button {
 
   .content-grid {
     @apply gap-4;
+    width: 100%;
   }
 
   .panel {
     @apply p-4;
+    width: 100%;
   }
 
   .panel-title {
     @apply text-sm leading-relaxed;
+  }
+
+  .section-heading {
+    @apply flex-row items-center justify-between gap-3;
+  }
+
+  .section-heading span {
+    @apply shrink-0 text-xs;
   }
 
   .results-tab-panel {
@@ -839,6 +859,42 @@ button {
 
   .results-tabs button {
     @apply text-xs;
+  }
+
+  .overlap-filter {
+    @apply grid gap-2;
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+  }
+
+  .overlap-filter > span {
+    @apply mr-0;
+    grid-column: 1 / -1;
+  }
+
+  .overlap-filter button {
+    @apply w-full justify-center px-2;
+  }
+
+  .clock-readout {
+    @apply gap-1 px-2 py-3;
+  }
+
+  .clock-readout button {
+    @apply min-w-0 px-2 text-base;
+  }
+
+  .clock-readout span {
+    @apply text-xl;
+  }
+
+  .clock-face {
+    width: min(100%, 18.5rem);
+  }
+}
+
+@media (max-width: 420px) {
+  .overlap-filter {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 }
 
@@ -1174,6 +1230,7 @@ button {
   @apply relative mx-auto rounded-full border;
   width: min(100%, 20.5rem);
   aspect-ratio: 1;
+  container-type: size;
   isolation: isolate;
   border-color: rgba(164, 236, 212, 0.22);
   background:
@@ -1223,7 +1280,7 @@ button {
   border-radius: 999px;
   background: rgba(247, 255, 252, 0.92);
   box-shadow: 0 0 8px rgba(164, 236, 212, 0.34);
-  transform: rotate(var(--angle)) translateY(-9.6rem);
+  transform: rotate(var(--angle)) translateY(calc(-50cqw + 1rem));
 }
 
 .clock-marker.major {
@@ -1236,7 +1293,7 @@ button {
   width: 3px;
   margin-left: -1.5px;
   margin-top: -7px;
-  transform: rotate(var(--angle)) translateY(-9.5rem);
+  transform: rotate(var(--angle)) translateY(calc(-50cqw + 1rem));
 }
 
 .clock-marker.minor {
@@ -1246,7 +1303,7 @@ button {
   margin-top: -3px;
   background: rgba(247, 255, 252, 0.48);
   box-shadow: none;
-  transform: rotate(var(--angle)) translateY(-9.28rem);
+  transform: rotate(var(--angle)) translateY(calc(-50cqw + 1.25rem));
 }
 
 .clock-hand {
