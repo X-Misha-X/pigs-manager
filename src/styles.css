@@ -320,7 +320,7 @@ button {
   letter-spacing: 0.045em;
 }
 
-.screen-meta-row span {
+.screen-meta-row > span {
   @apply inline-flex items-center gap-2 rounded-md px-3 py-1.5;
   background: rgba(255, 255, 255, 0.08);
   border: 1px solid rgba(164, 236, 212, 0.12);
@@ -782,7 +782,8 @@ button {
   }
 
   .topbar h1 {
-    @apply mt-3 pl-0 text-sm leading-snug;
+    @apply mt-3 text-sm leading-snug;
+    padding-left: 10px;
   }
 
   .topbar > div:first-child {
@@ -805,12 +806,21 @@ button {
   }
 
   .user-menu-trigger {
-    @apply h-12 w-12 px-0 text-sm;
+    @apply h-14 w-14 border-0 bg-transparent p-0 text-sm;
   }
 
   .header-user-avatar,
   .header-admin-avatar {
-    @apply h-9 w-9;
+    @apply h-12 w-12;
+  }
+
+  .header-user-avatar {
+    border-width: 0;
+  }
+
+  .header-admin-avatar {
+    border-color: transparent;
+    background: transparent;
   }
 
   .user-menu-trigger > span {
@@ -821,7 +831,7 @@ button {
     @apply flex-col items-stretch;
   }
 
-  .screen-meta-row span,
+  .screen-meta-row > span,
   .share-results-button {
     @apply w-full justify-center;
   }
@@ -836,9 +846,15 @@ button {
     width: 100%;
   }
 
+  .content-grid > section {
+    @apply w-full min-w-0;
+  }
+
   .panel {
     @apply p-4;
-    width: 100%;
+    width: calc(100% + 1.5rem);
+    margin-left: -0.75rem;
+    margin-right: -0.75rem;
   }
 
   .panel-title {
@@ -851,6 +867,10 @@ button {
 
   .section-heading span {
     @apply shrink-0 text-xs;
+  }
+
+  .section-heading .panel-title {
+    @apply mb-0;
   }
 
   .results-tab-panel {
@@ -872,7 +892,8 @@ button {
   }
 
   .overlap-filter button {
-    @apply w-full justify-center px-2;
+    @apply w-full justify-center px-1 text-[10px];
+    min-height: 2.25rem;
   }
 
   .clock-readout {
@@ -889,12 +910,6 @@ button {
 
   .clock-face {
     width: min(100%, 18.5rem);
-  }
-}
-
-@media (max-width: 420px) {
-  .overlap-filter {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 }
 
