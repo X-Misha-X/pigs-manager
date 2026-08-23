@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from "react";
+import React, { useEffect, useMemo, useRef, useState } from "react";
 import { createRoot } from "react-dom/client";
 import {
   CalendarDays,
@@ -1009,6 +1009,7 @@ function LoginScreen({
   onSelectVoter: (name: string) => void;
 }) {
   const [pendingVoterName, setPendingVoterName] = useState("");
+  const visibleVoters = pendingVoterName ? [pendingVoterName] : VOTERS;
 
   function requestVoterConfirmation(name: string) {
     setPendingVoterName(name);
@@ -1019,6 +1020,7 @@ function LoginScreen({
     if (!pendingVoterName) return;
     onSelectVoter(pendingVoterName);
     setPendingVoterName("");
+    window.scrollTo({ top: 0, left: 0, behavior: "auto" });
   }
 
   function cancelVoterConfirmation() {
@@ -1041,7 +1043,7 @@ function LoginScreen({
             SELECCIONA TU USUARIO
           </h2>
           <div className="login-grid">
-            {VOTERS.map((name) => (
+            {visibleVoters.map((name) => (
               <button
                 className={`voter-button login-user-button ${pendingVoterName === name ? "pending" : ""}`}
                 key={name}
@@ -1053,18 +1055,20 @@ function LoginScreen({
                 </span>
               </button>
             ))}
-            <button
-              className={`voter-button login-user-button admin-login-button ${adminOpen ? "active" : ""}`}
-              onClick={() => {
-                setPendingVoterName("");
-                onAdminOpen();
-              }}
-            >
-              <span className="voter-button-content">
-                <img className="admin-avatar-placeholder" src={ADMIN_AVATAR} alt="" aria-hidden="true" />
-                <span>ADMIN</span>
-              </span>
-            </button>
+            {!pendingVoterName ? (
+              <button
+                className={`voter-button login-user-button admin-login-button ${adminOpen ? "active" : ""}`}
+                onClick={() => {
+                  setPendingVoterName("");
+                  onAdminOpen();
+                }}
+              >
+                <span className="voter-button-content">
+                  <img className="admin-avatar-placeholder" src={ADMIN_AVATAR} alt="" aria-hidden="true" />
+                  <span>ADMIN</span>
+                </span>
+              </button>
+            ) : null}
           </div>
 
           {pendingVoterName ? (
@@ -1128,10 +1132,34 @@ function UserSessionMenu({
   voterName: string;
 }) {
   const [open, setOpen] = useState(false);
+  const menuRef = useRef<HTMLDivElement | null>(null);
   const label = admin ? "ADMIN" : voterName;
 
+  useEffect(() => {
+    if (!open) return;
+
+    function closeFromOutside(event: PointerEvent) {
+      if (!menuRef.current?.contains(event.target as Node)) {
+        setOpen(false);
+      }
+    }
+
+    function closeFromEscape(event: KeyboardEvent) {
+      if (event.key === "Escape") {
+        setOpen(false);
+      }
+    }
+
+    document.addEventListener("pointerdown", closeFromOutside);
+    document.addEventListener("keydown", closeFromEscape);
+    return () => {
+      document.removeEventListener("pointerdown", closeFromOutside);
+      document.removeEventListener("keydown", closeFromEscape);
+    };
+  }, [open]);
+
   return (
-    <div className="user-menu">
+    <div className="user-menu" ref={menuRef}>
       <button
         className="user-menu-trigger"
         onClick={() => setOpen((value) => !value)}

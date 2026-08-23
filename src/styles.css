@@ -1593,6 +1593,39 @@ button {
   opacity: 0.48;
 }
 
+@media (max-width: 640px) {
+  .user-menu-trigger {
+    @apply h-14 w-14 border-0 bg-transparent p-0;
+    box-shadow: none;
+  }
+
+  .user-menu-trigger:hover {
+    background: transparent;
+    border-color: transparent;
+  }
+
+  .header-user-avatar,
+  .header-admin-avatar {
+    @apply h-12 w-12;
+  }
+
+  .overlap-filter {
+    @apply mt-3 grid gap-2;
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+    align-items: center;
+  }
+
+  .overlap-filter > span {
+    @apply mr-0;
+    grid-column: 1 / -1;
+  }
+
+  .overlap-filter button {
+    @apply min-h-9 justify-center px-1 text-[10px];
+    width: 100%;
+  }
+}
+
 .overlap-list {
   min-height: 13rem;
   align-content: start;
