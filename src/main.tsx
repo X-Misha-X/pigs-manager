@@ -92,7 +92,13 @@ const ADMIN_PIN = import.meta.env.VITE_ADMIN_PIN as string | undefined;
 const IS_DEV = import.meta.env.DEV;
 const USE_SUPABASE = Boolean(SUPABASE_URL && SUPABASE_ANON_KEY);
 const VOTERS = ["MISHA", "LEKU", "SEPIA", "ICHITBO"];
-const SHARE_DIVIDER = "--------------------";
+const SHARE_EMOJI = {
+  pig: String.fromCodePoint(0x1f437),
+  calendar: String.fromCodePoint(0x1f4c5),
+  trophy: String.fromCodePoint(0x1f3c6),
+  medals: [String.fromCodePoint(0x1f947), String.fromCodePoint(0x1f948), String.fromCodePoint(0x1f949)],
+  star: String.fromCodePoint(0x2b50),
+};
 const VOTER_AVATARS: Record<string, string> = {
   MISHA: "/avatars/misha.png",
   LEKU: "/avatars/leku.png",
@@ -188,18 +194,17 @@ function buildResultsMessage(summary: Summary) {
     ? summary.overlaps
         .slice(0, 5)
         .map((overlap, index) => {
-          return `#${index + 1} *${formatRange(overlap)}*\n${overlap.voters.join(", ")}`;
+          const rank = SHARE_EMOJI.medals[index] ?? SHARE_EMOJI.star;
+          return `${rank} *${formatRange(overlap)}*\n${overlap.voters.join(", ")}`;
         })
         .join("\n\n")
     : "Sin coincidencias por ahora.";
 
   return [
-    "*Pigs Manager*",
-    SHARE_DIVIDER,
-    formatDate(summary.date),
+    `${SHARE_EMOJI.pig} *Pigs Manager*`,
+    `${SHARE_EMOJI.calendar} ${formatDate(summary.date)}`,
     "",
-    "*TOP MATCHES*",
-    SHARE_DIVIDER,
+    `${SHARE_EMOJI.trophy} *TOP MATCHES*`,
     topMatches,
   ].join("\n");
 }
@@ -1181,7 +1186,7 @@ function App() {
   function shareResultsOnWhatsapp() {
     if (!summary) return;
     const message = buildResultsMessage(summary);
-    window.open(`https://wa.me/?text=${encodeURIComponent(message)}`, "_blank", "noopener,noreferrer");
+    window.open(`https://api.whatsapp.com/send?text=${encodeURIComponent(message)}`, "_blank", "noopener,noreferrer");
   }
 
   return (
