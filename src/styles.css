@@ -766,17 +766,162 @@ button {
   @apply absolute right-4 z-20;
 }
 
-@media (max-width: 520px) {
-  .voter-button {
-    @apply min-h-20 text-xl;
+@media (max-width: 640px) {
+  body {
+    overflow-x: hidden;
   }
 
-  .voter-avatar {
-    @apply h-20 w-20;
+  .app-layout {
+    @apply px-3 pb-6 pt-3;
+  }
+
+  .topbar-inner {
+    @apply gap-3 pb-4;
+  }
+
+  .topbar h1 {
+    @apply mt-3 pl-0 text-sm leading-snug;
+  }
+
+  .eyebrow {
+    @apply text-2xl;
+    max-width: 100%;
+    overflow-wrap: anywhere;
+  }
+
+  .session-actions {
+    @apply mr-0 w-full justify-start;
+  }
+
+  .user-menu,
+  .user-menu-trigger {
+    max-width: 100%;
+  }
+
+  .user-menu-trigger {
+    @apply h-12 px-3 text-sm;
+  }
+
+  .header-user-avatar,
+  .header-admin-avatar {
+    @apply h-9 w-9;
+  }
+
+  .screen-meta-row {
+    @apply flex-col items-stretch;
+  }
+
+  .screen-meta-row span,
+  .share-results-button {
+    @apply w-full justify-center;
+  }
+
+  .share-results-button {
+    @apply h-11;
+    min-width: 0;
+  }
+
+  .content-grid {
+    @apply gap-4;
+  }
+
+  .panel {
+    @apply p-4;
+  }
+
+  .panel-title {
+    @apply text-sm leading-relaxed;
+  }
+
+  .results-tab-panel {
+    min-height: auto;
+  }
+
+  .results-tabs button {
+    @apply text-xs;
+  }
+}
+
+@media (max-width: 520px) {
+  .login-shell {
+    @apply px-3 py-4;
+  }
+
+  .login-card {
+    @apply mt-4 gap-5;
+  }
+
+  .login-brand .eyebrow {
+    @apply text-3xl;
+    display: inline-block;
+    max-width: calc(100vw - 2rem);
+    overflow-wrap: anywhere;
+  }
+
+  .login-brand h1 {
+    @apply mt-4 text-lg leading-snug;
+  }
+
+  .login-panel {
+    @apply p-3;
+  }
+
+  .login-grid {
+    @apply gap-y-4;
+    max-width: none;
+    padding-right: 0.25rem;
+  }
+
+  .sidebar-title {
+    @apply text-xs leading-relaxed;
+  }
+
+  .voter-button {
+    @apply min-h-[4.75rem] text-lg;
+    width: 100%;
+  }
+
+  .voter-avatar,
+  .admin-avatar-placeholder {
+    @apply h-[4.75rem] w-[4.75rem];
+    border-width: 3px;
   }
 
   .voter-button-content > span {
-    @apply min-h-14 pl-7;
+    @apply min-h-14 pl-7 pr-3;
+    min-width: 0;
+  }
+
+  .admin-login-button {
+    width: 100%;
+  }
+
+  .login-confirm-panel {
+    @apply mt-6 flex-col gap-4 p-4;
+  }
+
+  .voter-confirm-avatar {
+    @apply h-24 w-24;
+  }
+
+  .login-confirm-panel p {
+    @apply text-base leading-relaxed;
+  }
+
+  .login-confirm-actions {
+    @apply grid w-full gap-3;
+  }
+
+  .login-confirm-actions button {
+    @apply min-w-0 w-full;
+  }
+
+  .login-admin-panel {
+    @apply p-3;
+  }
+
+  .login-admin-panel > div {
+    @apply grid-cols-1;
   }
 }
 
