@@ -185,27 +185,27 @@ function formatRange(range: Pick<Range, "start" | "end">) {
 function buildResultsMessage(summary: Summary) {
   const voteLines = VOTERS.map((voter) => {
     const vote = summary.votes.find((item) => item.voter.toLowerCase() === voter.toLowerCase());
-    if (!vote) return `• *${voter}* todavía no votó`;
-    if (!vote.canPlay) return `• *${voter}* no puede jugar`;
-    if (!vote.ranges.length) return `• *${voter}* sin rangos`;
-    return `• *${voter}* ${vote.ranges.map(formatRange).join(", ")}`;
+    if (!vote) return `- *${voter}* todavía no votó`;
+    if (!vote.canPlay) return `- *${voter}* no puede jugar`;
+    if (!vote.ranges.length) return `- *${voter}* sin rangos`;
+    return `- *${voter}* ${vote.ranges.map(formatRange).join(", ")}`;
   });
   const overlapLines = summary.overlaps.length
     ? summary.overlaps
         .slice(0, 5)
-        .map((overlap, index) => `${["🥇", "🥈", "🥉", "⭐", "⭐"][index]} *${formatRange(overlap)}*\n   ${overlap.voters.join(", ")}`)
+        .map((overlap, index) => `#${index + 1} *${formatRange(overlap)}*\n${overlap.voters.join(", ")}`)
     : ["Sin coincidencias por ahora."];
 
   return [
-    "🐷 *Pigs Manager*",
-    `📅 ${formatDate(summary.date)}`,
+    "*Pigs Manager*",
+    formatDate(summary.date),
     "",
-    `✅ Confirmaron *${summary.votes.length}/${VOTERS.length}*`,
+    `Confirmaron *${summary.votes.length}/${VOTERS.length}*`,
     "",
-    "🗳️ *Votos*",
+    "*Votos*",
     ...voteLines,
     "",
-    "🎯 *Coincidencias*",
+    "*TOP MATCHES*",
     ...overlapLines,
   ].join("\n");
 }

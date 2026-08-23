@@ -231,7 +231,7 @@ def build_discord_embed(date: str, votes: list[dict[str, Any]], overlaps: list[d
         "color": 0xFF4FA3,
         "fields": [
             {"name": "🗳️ Votos", "value": "\n\n".join(vote_lines), "inline": False},
-            {"name": "🎯 Coincidencias", "value": "\n\n".join(overlap_lines), "inline": False},
+            {"name": "TOP MATCHES", "value": "\n\n".join(overlap_lines), "inline": False},
         ],
     }
 
@@ -316,7 +316,7 @@ def notify_discord_if_complete(date: str | None = None, force: bool = False, pin
     payload = json.dumps(
         {
             "username": "Pigs Manager",
-            "content": "🐷 Ya votaron todos.",
+            "content": "Ya votaron todos.",
             "embeds": [build_discord_embed(target_date, votes, overlaps)],
         },
         ensure_ascii=False,

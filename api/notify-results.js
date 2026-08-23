@@ -148,7 +148,7 @@ function buildDiscordEmbed(date, votes, overlaps) {
         inline: false,
       },
       {
-        name: "🎯 Coincidencias",
+        name: "TOP MATCHES",
         value: overlapLines.join("\n\n"),
         inline: false,
       },
@@ -329,7 +329,7 @@ export default async function handler(request, response) {
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
         username: "Pigs Manager",
-        content: "🐷 Ya votaron todos.",
+        content: "Ya votaron todos.",
         embeds: [buildDiscordEmbed(date, votes, overlaps)],
       }),
     });
