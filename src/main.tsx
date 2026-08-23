@@ -202,6 +202,7 @@ function buildResultsMessage(summary: Summary) {
 
   return [
     `${SHARE_EMOJI.pig} *Pigs Manager*`,
+    "",
     "*Resultados del día*",
     `${SHARE_EMOJI.calendar} ${formatDate(summary.date)}`,
     "",
