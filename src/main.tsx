@@ -225,6 +225,11 @@ function buildResultsMessage(summary: Summary) {
     `${SHARE_EMOJI.trophy} *TOP MATCHES*`,
     "",
     topMatches,
+    "",
+    "━━━━━━━━━━━━━━",
+    "",
+    "Pueden votar acá:",
+    "https://pigs-manager.vercel.app/",
   ].join("\n");
 }
 
