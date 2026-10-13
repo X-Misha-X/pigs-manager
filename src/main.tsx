@@ -1162,7 +1162,7 @@ function LoginScreen({
           ) : null}
         </div>
       </section>
-      <footer className="app-footer">versión {APP_VERSION}</footer>
+      <footer className="app-footer">version {APP_VERSION} - Puto el que lee</footer>
     </main>
   );
 }
@@ -2163,7 +2163,7 @@ function App() {
           </div>
           <div aria-hidden="true" className="matches-scroll-tail" style={{ height: `${matchesScrollTail}px` }} />
         </div>
-        <footer className="app-footer">versión {APP_VERSION}</footer>
+        <footer className="app-footer">version {APP_VERSION} - Puto el que lee</footer>
       </div>
       {favoriteModalOpen ? (
         <div className="inline-modal favorite-modal" role="dialog" aria-modal="true" aria-label="Editar favoritos">

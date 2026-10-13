@@ -69,19 +69,23 @@ button {
 }
 
 .app-layout {
-  @apply mx-auto max-w-6xl px-4 pb-8 pt-4;
+  @apply mx-auto flex min-h-screen max-w-6xl flex-col px-4 pt-4;
 }
 
 .app-footer {
-  @apply border-t pt-4 text-center text-xs;
-  margin-top: 1.5rem;
+  @apply flex min-h-16 items-center justify-center border-t py-4 text-center text-xs;
   border-color: rgba(164, 236, 212, 0.14);
   color: rgba(247, 255, 252, 0.56);
   letter-spacing: 0.08em;
 }
 
+.app-layout > .app-footer {
+  margin-top: auto;
+  margin-inline: -1rem;
+}
+
 .app-main {
-  @apply min-w-0;
+  @apply min-w-0 flex-1;
 }
 
 .sidebar-title {
@@ -89,8 +93,13 @@ button {
 }
 
 .login-shell {
-  @apply grid min-h-screen px-4 py-5;
-  align-items: start;
+  @apply flex min-h-screen flex-col px-4 pt-5;
+  align-items: stretch;
+}
+
+.login-shell > .app-footer {
+  margin-top: auto;
+  margin-inline: -1rem;
 }
 
 .login-card {
@@ -960,9 +969,13 @@ button {
   }
 
   .app-layout {
-    @apply px-3 pb-6 pt-3;
+    @apply px-3 pt-3;
     max-width: none;
     width: 100%;
+  }
+
+  .app-layout > .app-footer {
+    margin-inline: -0.75rem;
   }
 
   .topbar-inner {
@@ -1099,7 +1112,11 @@ button {
 
 @media (max-width: 520px) {
   .login-shell {
-    @apply px-3 py-4;
+    @apply px-3 pt-4;
+  }
+
+  .login-shell > .app-footer {
+    margin-inline: -0.75rem;
   }
 
   .login-card {
