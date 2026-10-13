@@ -72,6 +72,14 @@ button {
   @apply mx-auto max-w-6xl px-4 pb-8 pt-4;
 }
 
+.app-footer {
+  @apply border-t pt-4 text-center text-xs;
+  margin-top: 1.5rem;
+  border-color: rgba(164, 236, 212, 0.14);
+  color: rgba(247, 255, 252, 0.56);
+  letter-spacing: 0.08em;
+}
+
 .app-main {
   @apply min-w-0;
 }

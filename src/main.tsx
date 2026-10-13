@@ -17,7 +17,10 @@ import {
   Vote,
   X,
 } from "lucide-react";
+import packageInfo from "../package.json";
 import "./styles.css";
+
+const APP_VERSION = packageInfo.version;
 
 type Range = {
   start: string;
@@ -1159,6 +1162,7 @@ function LoginScreen({
           ) : null}
         </div>
       </section>
+      <footer className="app-footer">versión {APP_VERSION}</footer>
     </main>
   );
 }
@@ -2159,6 +2163,7 @@ function App() {
           </div>
           <div aria-hidden="true" className="matches-scroll-tail" style={{ height: `${matchesScrollTail}px` }} />
         </div>
+        <footer className="app-footer">versión {APP_VERSION}</footer>
       </div>
       {favoriteModalOpen ? (
         <div className="inline-modal favorite-modal" role="dialog" aria-modal="true" aria-label="Editar favoritos">
