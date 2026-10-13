@@ -6,6 +6,7 @@ import re
 import sqlite3
 import urllib.error
 import urllib.request
+from urllib.parse import parse_qs, urlparse
 from datetime import datetime
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from itertools import combinations
@@ -31,6 +32,17 @@ DISCORD_EMOJI = {
 
 def today_buenos_aires() -> str:
     return datetime.now(TIMEZONE).date().isoformat()
+
+
+def normalize_date(value: Any | None = None) -> str:
+    if value is None or value == "":
+        return today_buenos_aires()
+    candidate = str(value)
+    try:
+        datetime.fromisoformat(candidate)
+    except ValueError as error:
+        raise ValueError("La fecha no es valida.") from error
+    return candidate[:10]
 
 
 def now_buenos_aires() -> str:
@@ -196,8 +208,8 @@ def to_overlap(start: int, end: int, voters: tuple[str, ...]) -> dict[str, Any]:
     return {"start": minutes_to_time(start), "end": minutes_to_time(end), "voters": list(voters)}
 
 
-def summary() -> dict[str, Any]:
-    date = today_buenos_aires()
+def summary(date: str | None = None) -> dict[str, Any]:
+    date = normalize_date(date)
     votes = get_votes(date)
     return {
         "date": date,
@@ -344,11 +356,19 @@ class SurveyHandler(BaseHTTPRequestHandler):
         self.end_headers()
 
     def do_GET(self) -> None:
-        if self.path == "/api/summary":
-            self.send_json(summary())
+        parsed_url = urlparse(self.path)
+        query = parse_qs(parsed_url.query)
+        if parsed_url.path == "/api/summary":
+            try:
+                self.send_json(summary(query.get("date", [None])[0]))
+            except ValueError as error:
+                self.send_json({"error": str(error)}, status=400)
             return
-        if self.path.startswith("/api/notify-results"):
-            self.send_json(notification_diagnostics())
+        if parsed_url.path == "/api/notify-results":
+            try:
+                self.send_json(notification_diagnostics(normalize_date(query.get("date", [None])[0])))
+            except ValueError as error:
+                self.send_json({"error": str(error)}, status=400)
             return
         self.send_error(404)
 
@@ -372,6 +392,7 @@ class SurveyHandler(BaseHTTPRequestHandler):
 
         try:
             payload = self.read_json()
+            date = normalize_date(payload.get("date"))
             voter = normalize_name(str(payload.get("voter", "")))
             can_play = bool(payload.get("canPlay", False))
             ranges = validate_ranges(can_play, payload.get("ranges", []))
@@ -391,7 +412,7 @@ class SurveyHandler(BaseHTTPRequestHandler):
                         updated_at = excluded.updated_at
                     """,
                     (
-                        today_buenos_aires(),
+                        date,
                         voter_key,
                         voter,
                         int(can_play),
@@ -401,7 +422,7 @@ class SurveyHandler(BaseHTTPRequestHandler):
                     ),
                 )
 
-            self.send_json(summary())
+            self.send_json(summary(date))
         except ValueError as error:
             self.send_json({"error": str(error)}, status=400)
         except json.JSONDecodeError:
@@ -417,12 +438,13 @@ class SurveyHandler(BaseHTTPRequestHandler):
             if not ADMIN_PIN or payload.get("pin") != ADMIN_PIN:
                 self.send_json({"error": "PIN incorrecto."}, status=403)
                 return
+            date = normalize_date(payload.get("date"))
 
             with connect() as db:
-                db.execute("DELETE FROM votes WHERE date = ?", (today_buenos_aires(),))
-                db.execute("DELETE FROM notification_events WHERE event_key = ?", (f"today-results:{today_buenos_aires()}",))
+                db.execute("DELETE FROM votes WHERE date = ?", (date,))
+                db.execute("DELETE FROM notification_events WHERE event_key = ?", (f"today-results:{date}",))
 
-            self.send_json(summary())
+            self.send_json(summary(date))
         except json.JSONDecodeError:
             self.send_json({"error": "El cuerpo de la solicitud no es JSON valido."}, status=400)
 

@@ -60,6 +60,46 @@ begin
   end if;
 end $$;
 
+create table if not exists public.favorite_ranges (
+  voter_key text primary key,
+  voter text not null,
+  ranges jsonb not null default '[]'::jsonb,
+  updated_at timestamptz not null,
+  constraint favorite_ranges_known_voter check (voter_key in ('misha', 'leku', 'sepia', 'ichitbo')),
+  constraint favorite_ranges_ranges_is_array check (jsonb_typeof(ranges) = 'array')
+);
+
+alter table public.favorite_ranges enable row level security;
+
+revoke all on table public.favorite_ranges from PUBLIC, anon, authenticated;
+grant select, insert, update on table public.favorite_ranges to anon;
+
+drop policy if exists "Public can read favorite ranges" on public.favorite_ranges;
+drop policy if exists "Public can insert favorite ranges" on public.favorite_ranges;
+drop policy if exists "Public can update favorite ranges" on public.favorite_ranges;
+drop policy if exists "Anonymous can read favorite ranges" on public.favorite_ranges;
+drop policy if exists "Anonymous can insert favorite ranges" on public.favorite_ranges;
+drop policy if exists "Anonymous can update favorite ranges" on public.favorite_ranges;
+
+create policy "Anonymous can read favorite ranges"
+on public.favorite_ranges
+for select
+to anon
+using (true);
+
+create policy "Anonymous can insert favorite ranges"
+on public.favorite_ranges
+for insert
+to anon
+with check (true);
+
+create policy "Anonymous can update favorite ranges"
+on public.favorite_ranges
+for update
+to anon
+using (true)
+with check (true);
+
 create table if not exists public.notification_events (
   event_key text primary key,
   date date not null,

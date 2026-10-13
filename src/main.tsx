@@ -3,6 +3,8 @@ import { createRoot } from "react-dom/client";
 import {
   CalendarDays,
   Check,
+  Clock3,
+  Home,
   Loader2,
   Pencil,
   Plus,
@@ -11,6 +13,8 @@ import {
   Share2,
   Trash2,
   UserRound,
+  UsersRound,
+  Vote,
   X,
 } from "lucide-react";
 import "./styles.css";
@@ -25,7 +29,7 @@ type TimeField = "start" | "end";
 type DialModes = Record<string, "hour" | "minute">;
 type ActiveRangeFields = Record<string, TimeField>;
 type CollapsedRanges = Record<number, boolean>;
-type ResultsTab = "votes" | "matches";
+type DayTab = "today" | "tomorrow";
 
 function WhatsappIcon({ size = 16 }: { size?: number }) {
   return (
@@ -66,14 +70,6 @@ type Summary = {
     end: string;
     voters: string[];
   }[];
-  suggestions: RangeSuggestion[];
-};
-
-type RangeSuggestion = {
-  start: string;
-  end: string;
-  voters: string[];
-  hits: number;
 };
 
 type SupabaseVoteRow = {
@@ -100,6 +96,13 @@ type SupabaseGameRow = {
   game_votes?: SupabaseGameVoteRow[];
 };
 
+type SupabaseFavoriteRangeRow = {
+  voter_key: string;
+  voter: string;
+  ranges: Range[];
+  updated_at: string;
+};
+
 const API_BASE = import.meta.env.DEV ? "http://127.0.0.1:8000/api" : "/api";
 const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL as string | undefined;
 const SUPABASE_ANON_KEY = import.meta.env.VITE_SUPABASE_ANON_KEY as string | undefined;
@@ -122,6 +125,8 @@ const VOTER_AVATARS: Record<string, string> = {
 };
 const ADMIN_AVATAR = "/avatars/admin.png";
 const GAMES_STORAGE_KEY = "pigs-manager-games";
+const FAVORITE_RANGES_STORAGE_KEY = "pigs-manager-favorite-ranges";
+const MAX_FAVORITE_RANGES = 4;
 const MINUTES = Array.from({ length: 12 }, (_, index) => String(index * 5).padStart(2, "0"));
 const HOURS = Array.from({ length: 24 }, (_, index) => String(index).padStart(2, "0"));
 const END_HOURS = [...HOURS, "24"];
@@ -297,6 +302,35 @@ function readStoredGames(): GameOption[] {
   }
 }
 
+function favoriteRangesStorageKey(voter: string) {
+  return `${FAVORITE_RANGES_STORAGE_KEY}:${voter.toLowerCase()}`;
+}
+
+function normalizeFavoriteRanges(ranges: Range[]) {
+  const unique = new Map<string, Range>();
+  ranges.forEach((range) => {
+    if (!isValidRange(range)) return;
+    unique.set(`${range.start}-${range.end}`, { start: range.start, end: range.end });
+  });
+  return [...unique.values()].slice(0, MAX_FAVORITE_RANGES);
+}
+
+function readStoredFavoriteRanges(voter: string): Range[] {
+  try {
+    const rawRanges = localStorage.getItem(favoriteRangesStorageKey(voter));
+    if (!rawRanges) return [];
+    const parsedRanges = JSON.parse(rawRanges);
+    if (!Array.isArray(parsedRanges)) return [];
+    return normalizeFavoriteRanges(parsedRanges);
+  } catch {
+    return [];
+  }
+}
+
+function writeStoredFavoriteRanges(voter: string, ranges: Range[]) {
+  localStorage.setItem(favoriteRangesStorageKey(voter), JSON.stringify(normalizeFavoriteRanges(ranges)));
+}
+
 function todayBuenosAires() {
   return new Intl.DateTimeFormat("en-CA", {
     timeZone: "America/Argentina/Buenos_Aires",
@@ -329,6 +363,10 @@ function gameFromSupabaseRow(row: SupabaseGameRow): GameOption {
       .map((vote) => vote.voter)
       .filter((voter) => VOTERS.includes(voter)),
   };
+}
+
+function favoriteRangesFromSupabaseRow(row: SupabaseFavoriteRangeRow): Range[] {
+  return normalizeFavoriteRanges(row.ranges ?? []);
 }
 
 function friendlyGameError(error: unknown) {
@@ -433,50 +471,6 @@ function calculateOverlaps(votes: Vote[]): Summary["overlaps"] {
   return sortOverlaps(overlaps);
 }
 
-function calculateRangeSuggestions(votes: Vote[]): RangeSuggestion[] {
-  const votesByDate = votes.reduce<Record<string, Vote[]>>((groups, vote) => {
-    const date = vote.date ?? vote.updatedAt.slice(0, 10);
-    groups[date] = [...(groups[date] ?? []), vote];
-    return groups;
-  }, {});
-  const suggestions = new Map<string, RangeSuggestion>();
-
-  Object.values(votesByDate).forEach((dateVotes) => {
-    const latestVoteByVoter = new Map<string, Vote>();
-    const seenRangesToday = new Set<string>();
-    dateVotes.forEach((vote) => {
-      const current = latestVoteByVoter.get(vote.voter);
-      if (!current || Date.parse(vote.updatedAt) > Date.parse(current.updatedAt)) {
-        latestVoteByVoter.set(vote.voter, vote);
-      }
-    });
-    calculateOverlaps([...latestVoteByVoter.values()])
-      .filter((overlap) => overlap.voters.length >= 3)
-      .forEach((overlap) => {
-        const key = `${overlap.start}-${overlap.end}`;
-        const current = suggestions.get(key);
-        const voters = current && current.voters.length > overlap.voters.length ? current.voters : overlap.voters;
-        suggestions.set(key, {
-          start: overlap.start,
-          end: overlap.end,
-          voters,
-          hits: (current?.hits ?? 0) + (seenRangesToday.has(key) ? 0 : 1),
-        });
-        seenRangesToday.add(key);
-      });
-  });
-
-  return [...suggestions.values()]
-    .sort((a, b) => {
-      const playersDiff = b.voters.length - a.voters.length;
-      if (playersDiff) return playersDiff;
-      const hitsDiff = b.hits - a.hits;
-      if (hitsDiff) return hitsDiff;
-      return rangeDuration(b) - rangeDuration(a);
-    })
-    .slice(0, 4);
-}
-
 async function supabaseRequest<T>(path: string, options?: RequestInit): Promise<T> {
   if (!SUPABASE_URL || !SUPABASE_ANON_KEY) {
     throw new Error("Faltan las variables de Supabase.");
@@ -503,37 +497,78 @@ async function supabaseRequest<T>(path: string, options?: RequestInit): Promise<
   return response.json();
 }
 
-async function loadAppSummary(): Promise<Summary> {
+async function loadAppSummary(date: string): Promise<Summary> {
   if (!USE_SUPABASE) {
-    return request<Summary>("/summary");
+    return request<Summary>(`/summary?date=${encodeURIComponent(date)}`);
   }
 
-  const date = todayBuenosAires();
   const rows = await supabaseRequest<SupabaseVoteRow[]>(`/votes?date=eq.${date}&select=*&order=voter.asc`);
-  const historicalRows = await supabaseRequest<SupabaseVoteRow[]>(
-    `/votes?date=lt.${date}&select=*&order=date.desc,updated_at.desc&limit=240`,
-  );
   const votes = rows.map(voteFromSupabaseRow);
-  const historicalVotes = historicalRows.map(voteFromSupabaseRow);
 
   return {
     date,
     timezone: "America/Argentina/Buenos_Aires",
     votes,
     overlaps: calculateOverlaps(votes),
-    suggestions: calculateRangeSuggestions(historicalVotes),
   };
 }
 
-async function saveAppVote(voter: string, canPlay: boolean, ranges: Range[], comment: string): Promise<Summary> {
+async function loadAppFavoriteRanges(voter: string): Promise<Range[]> {
+  if (!voter) return [];
+  if (!USE_SUPABASE) {
+    return readStoredFavoriteRanges(voter);
+  }
+
+  try {
+    const voterKey = voter.toLowerCase();
+    const rows = await supabaseRequest<SupabaseFavoriteRangeRow[]>(
+      `/favorite_ranges?voter_key=eq.${encodeURIComponent(voterKey)}&select=*&limit=1`,
+    );
+    const ranges = rows[0] ? favoriteRangesFromSupabaseRow(rows[0]) : [];
+    writeStoredFavoriteRanges(voter, ranges);
+    return ranges;
+  } catch (error) {
+    console.warn("No se pudieron cargar los favoritos desde Supabase. Uso localStorage.", error);
+    return readStoredFavoriteRanges(voter);
+  }
+}
+
+async function saveAppFavoriteRanges(voter: string, ranges: Range[]): Promise<Range[]> {
+  const cleanRanges = normalizeFavoriteRanges(ranges);
+  writeStoredFavoriteRanges(voter, cleanRanges);
+
+  if (!USE_SUPABASE) {
+    return cleanRanges;
+  }
+
+  try {
+    await supabaseRequest<SupabaseFavoriteRangeRow[]>("/favorite_ranges?on_conflict=voter_key", {
+      method: "POST",
+      body: JSON.stringify({
+        voter_key: voter.toLowerCase(),
+        voter,
+        ranges: cleanRanges,
+        updated_at: nowBuenosAires(),
+      }),
+      headers: {
+        Prefer: "resolution=merge-duplicates,return=representation",
+      },
+    });
+  } catch (error) {
+    console.warn("No se pudieron guardar los favoritos en Supabase. Quedaron guardados localmente.", error);
+  }
+
+  return cleanRanges;
+}
+
+async function saveAppVote(date: string, voter: string, canPlay: boolean, ranges: Range[], comment: string): Promise<Summary> {
   if (!USE_SUPABASE) {
     return request<Summary>("/votes", {
       method: "POST",
-      body: JSON.stringify({ voter, canPlay, ranges, comment }),
+      body: JSON.stringify({ date, voter, canPlay, ranges, comment }),
     });
   }
 
-  const date = todayBuenosAires();
   await supabaseRequest<SupabaseVoteRow[]>("/votes?on_conflict=date,voter_key", {
     method: "POST",
     body: JSON.stringify({
@@ -550,7 +585,7 @@ async function saveAppVote(voter: string, canPlay: boolean, ranges: Range[], com
     },
   });
 
-  return loadAppSummary();
+  return loadAppSummary(date);
 }
 
 type NotificationResult = {
@@ -582,12 +617,11 @@ async function notifyResultsIfComplete(summary: Summary): Promise<NotificationRe
   }
 }
 
-async function deleteAppVote(voter: string): Promise<Summary> {
+async function deleteAppVote(date: string, voter: string): Promise<Summary> {
   if (!USE_SUPABASE) {
-    return saveAppVote(voter, true, [], "");
+    return saveAppVote(date, voter, true, [], "");
   }
 
-  const date = todayBuenosAires();
   await supabaseRequest<undefined>(`/votes?date=eq.${date}&voter_key=eq.${voter.toLowerCase()}`, {
     method: "DELETE",
     headers: {
@@ -595,7 +629,7 @@ async function deleteAppVote(voter: string): Promise<Summary> {
     },
   });
 
-  return loadAppSummary();
+  return loadAppSummary(date);
 }
 
 async function loadAppGames(): Promise<GameOption[]> {
@@ -688,14 +722,14 @@ async function toggleAppGameVote(game: GameOption, voter: string): Promise<GameO
   return loadAppGames();
 }
 
-async function deleteTodayVotes(pin: string): Promise<Summary> {
+async function deleteDayVotesByDate(date: string, pin: string): Promise<Summary> {
   if (!USE_SUPABASE) {
     if (!ADMIN_PIN || pin !== ADMIN_PIN) {
       throw new Error("PIN incorrecto.");
     }
     return request<Summary>("/votes/today", {
       method: "DELETE",
-      body: JSON.stringify({ pin }),
+      body: JSON.stringify({ date, pin }),
     });
   }
 
@@ -704,21 +738,20 @@ async function deleteTodayVotes(pin: string): Promise<Summary> {
       throw new Error("PIN incorrecto. En local falta configurar ADMIN_PIN en .env.local o el PIN no coincide.");
     }
 
-    const date = todayBuenosAires();
     await supabaseRequest<undefined>(`/votes?date=eq.${date}`, {
       method: "DELETE",
       headers: {
         Prefer: "return=minimal",
       },
     });
-    return loadAppSummary();
+    return loadAppSummary(date);
   }
 
   await request<{ ok: boolean }>("/votes-today", {
     method: "DELETE",
-    body: JSON.stringify({ pin }),
+    body: JSON.stringify({ date, pin }),
   });
-  return loadAppSummary();
+  return loadAppSummary(date);
 }
 
 async function request<T>(path: string, options?: RequestInit): Promise<T> {
@@ -1200,7 +1233,12 @@ function UserSessionMenu({
 }
 
 function App() {
+  const sectionNavRef = useRef<HTMLElement | null>(null);
+  const [sectionNavStuck, setSectionNavStuck] = useState(false);
+  const [sectionNavShareWrapped, setSectionNavShareWrapped] = useState(false);
+  const [matchesScrollTail, setMatchesScrollTail] = useState(0);
   const [summary, setSummary] = useState<Summary | null>(null);
+  const [selectedDay, setSelectedDay] = useState<DayTab>("today");
   const [voterName, setVoterName] = useState("");
   const [canPlay, setCanPlay] = useState<boolean | null>(null);
   const [ranges, setRanges] = useState<Range[]>([DEFAULT_RANGE]);
@@ -1220,23 +1258,95 @@ function App() {
   const [adminError, setAdminError] = useState("");
   const [adminConfirming, setAdminConfirming] = useState(false);
   const [overlapFilters, setOverlapFilters] = useState<string[]>(VOTERS);
-  const [resultsTab, setResultsTab] = useState<ResultsTab>("votes");
+  const [favoriteRanges, setFavoriteRanges] = useState<Range[]>([]);
+  const [favoriteModalOpen, setFavoriteModalOpen] = useState(false);
+  const [favoriteDraftRanges, setFavoriteDraftRanges] = useState<Range[]>([]);
+  const [favoriteCollapsedRanges, setFavoriteCollapsedRanges] = useState<CollapsedRanges>({});
+  const [favoriteDialModes, setFavoriteDialModes] = useState<DialModes>({});
+  const [favoriteActiveRangeFields, setFavoriteActiveRangeFields] = useState<ActiveRangeFields>({});
+  const [favoriteSaving, setFavoriteSaving] = useState(false);
+  const [favoriteError, setFavoriteError] = useState("");
 
+  useEffect(() => {
+    const updateStickyState = () => {
+      const nextStuck = (sectionNavRef.current?.getBoundingClientRect().top ?? 1) <= 0;
+      setSectionNavStuck((current) => (current === nextStuck ? current : nextStuck));
+    };
+
+    updateStickyState();
+    window.addEventListener("scroll", updateStickyState, { passive: true });
+    window.addEventListener("resize", updateStickyState);
+    return () => {
+      window.removeEventListener("scroll", updateStickyState);
+      window.removeEventListener("resize", updateStickyState);
+    };
+  }, []);
+
+  useEffect(() => {
+    const sectionNav = sectionNavRef.current;
+    if (!sectionNav) return;
+
+    const updateShareRow = () => {
+      const firstLink = sectionNav.querySelector<HTMLAnchorElement>("a");
+      const shareButton = sectionNav.querySelector<HTMLElement>(".share-results-button");
+      if (!firstLink || !shareButton) return;
+
+      const wrapped = shareButton.getBoundingClientRect().top > firstLink.getBoundingClientRect().top + 12;
+      setSectionNavShareWrapped((current) => (current === wrapped ? current : wrapped));
+    };
+
+    const observer = new ResizeObserver(updateShareRow);
+    observer.observe(sectionNav);
+    window.addEventListener("resize", updateShareRow);
+    updateShareRow();
+    return () => {
+      observer.disconnect();
+      window.removeEventListener("resize", updateShareRow);
+    };
+  }, [voterName]);
+
+  const todayDate = todayBuenosAires();
+  const selectedDate = selectedDay === "today" ? todayDate : addDays(todayDate, 1);
+  const visibleSummary = summary?.date === selectedDate ? summary : null;
   const currentVote = useMemo(
-    () => summary?.votes.find((vote) => vote.voter.toLowerCase() === voterName.toLowerCase()),
-    [summary, voterName],
+    () => visibleSummary?.votes.find((vote) => vote.voter.toLowerCase() === voterName.toLowerCase()),
+    [visibleSummary, voterName],
   );
   const filteredOverlaps = useMemo(() => {
-    const overlaps = summary?.overlaps ?? [];
+    const overlaps = visibleSummary?.overlaps ?? [];
     if (overlapFilters.length === VOTERS.length) return overlaps;
     if (overlapFilters.length < 2) return [];
     return overlaps.filter((overlap) => overlap.voters.every((voter) => overlapFilters.includes(voter)));
-  }, [overlapFilters, summary?.overlaps]);
+  }, [overlapFilters, visibleSummary?.overlaps]);
+
+  useEffect(() => {
+    const matchesSection = document.getElementById("matches-section");
+    const layout = matchesSection?.closest<HTMLElement>(".app-layout");
+    const sectionNav = sectionNavRef.current;
+    if (!matchesSection || !layout || !sectionNav) return;
+
+    const updateMatchesScrollSpace = () => {
+      const stickyNavHeight = sectionNav.offsetHeight + (sectionNavStuck ? 12 : 24);
+      const bottomPadding = Number.parseFloat(getComputedStyle(layout).paddingBottom) || 0;
+      const targetOffset = Math.ceil(stickyNavHeight);
+      matchesSection.style.scrollMarginTop = `${targetOffset}px`;
+
+      const extraSpace = Math.max(
+        0,
+        window.innerHeight - targetOffset - matchesSection.offsetHeight - bottomPadding,
+      );
+      setMatchesScrollTail((current) => (Math.abs(current - extraSpace) < 1 ? current : extraSpace));
+    };
+
+    updateMatchesScrollSpace();
+    window.addEventListener("resize", updateMatchesScrollSpace);
+    return () => window.removeEventListener("resize", updateMatchesScrollSpace);
+  }, [filteredOverlaps.length, sectionNavStuck, selectedDay, voterName]);
   const resultVotes = useMemo(
     () =>
       VOTERS.map(
         (name) =>
-          summary?.votes.find((vote) => vote.voter.toLowerCase() === name.toLowerCase()) ?? {
+          visibleSummary?.votes.find((vote) => vote.voter.toLowerCase() === name.toLowerCase()) ?? {
             voter: name,
             canPlay: true,
             ranges: [],
@@ -1244,13 +1354,13 @@ function App() {
             updatedAt: "",
           },
       ),
-    [summary?.votes],
+    [visibleSummary?.votes],
   );
-  async function loadSummary() {
+  async function loadSummary(date: string) {
     setLoading(true);
     setError("");
     try {
-      setSummary(await loadAppSummary());
+      setSummary(await loadAppSummary(date));
     } catch (err) {
       setError(err instanceof Error ? err.message : "No se pudieron cargar los votos");
     } finally {
@@ -1259,8 +1369,54 @@ function App() {
   }
 
   useEffect(() => {
-    loadSummary();
-  }, []);
+    let cancelled = false;
+
+    async function loadSelectedSummary() {
+      setLoading(true);
+      setError("");
+      setNotificationNotice("");
+      try {
+        const loadedSummary = await loadAppSummary(selectedDate);
+        if (!cancelled) {
+          setSummary(loadedSummary);
+        }
+      } catch (err) {
+        if (!cancelled) {
+          setError(err instanceof Error ? err.message : "No se pudieron cargar los votos");
+        }
+      } finally {
+        if (!cancelled) {
+          setLoading(false);
+        }
+      }
+    }
+
+    loadSelectedSummary();
+    return () => {
+      cancelled = true;
+    };
+  }, [selectedDate]);
+
+  useEffect(() => {
+    let cancelled = false;
+
+    async function loadFavorites() {
+      if (!voterName) {
+        setFavoriteRanges([]);
+        setFavoriteModalOpen(false);
+        return;
+      }
+      const loadedRanges = await loadAppFavoriteRanges(voterName);
+      if (!cancelled) {
+        setFavoriteRanges(loadedRanges);
+      }
+    }
+
+    loadFavorites();
+    return () => {
+      cancelled = true;
+    };
+  }, [voterName]);
 
   useEffect(() => {
     if (!voterName) {
@@ -1285,7 +1441,7 @@ function App() {
       return;
     }
 
-    setCanPlay(null);
+    setCanPlay(true);
     setRanges([]);
     setComment("");
     setSavedRanges([]);
@@ -1462,7 +1618,7 @@ function App() {
           setError("Agrega al menos un rango horario antes de avanzar.");
           return;
         }
-        const cleanSummary = await deleteAppVote(voterName);
+        const cleanSummary = await deleteAppVote(selectedDate, voterName);
         setSummary(cleanSummary);
         resetVotingFlow({ keepVoter: true });
         return;
@@ -1475,7 +1631,7 @@ function App() {
         setError("La hora final no puede ser inferior a la de inicio.");
         return;
       }
-      const savedSummary = await saveAppVote(voterName, canPlay, usableRanges, comment.trim());
+      const savedSummary = await saveAppVote(selectedDate, voterName, canPlay, usableRanges, comment.trim());
       setSummary(savedSummary);
       const notificationResult = await notifyResultsIfComplete(savedSummary);
       if (notificationResult?.notified && notificationResult.updated) {
@@ -1523,6 +1679,162 @@ function App() {
     setCollapsedRanges(Object.fromEntries(nextRanges.map((_, rangeIndex) => [rangeIndex, true])));
   }
 
+  function createFavoriteDraft(sourceRanges: Range[]) {
+    return Array.from({ length: MAX_FAVORITE_RANGES }, (_, index) => {
+      const range = sourceRanges[index];
+      return range ? { start: range.start, end: range.end } : { ...DEFAULT_RANGE };
+    });
+  }
+
+  function createFavoriteCollapsedState(draftRanges: Range[]) {
+    const firstEmptyIndex = draftRanges.findIndex((range) => !isCompleteRange(range));
+    return Object.fromEntries(
+      draftRanges.map((range, index) => [index, isCompleteRange(range) || index !== firstEmptyIndex]),
+    );
+  }
+
+  function isFavoriteSlotDisabled(index: number) {
+    return index > 0 && !isCompleteRange(favoriteDraftRanges[index - 1]);
+  }
+
+  function openFavoriteEditor() {
+    const draftRanges = createFavoriteDraft(favoriteRanges);
+    setFavoriteDraftRanges(draftRanges);
+    setFavoriteCollapsedRanges(createFavoriteCollapsedState(draftRanges));
+    setFavoriteDialModes({});
+    setFavoriteActiveRangeFields({});
+    setFavoriteError("");
+    setFavoriteModalOpen(true);
+  }
+
+  function closeFavoriteEditor() {
+    if (favoriteSaving) return;
+    setFavoriteModalOpen(false);
+    setFavoriteError("");
+  }
+
+  function updateFavoriteRange(index: number, field: TimeField, value: string) {
+    if (isFavoriteSlotDisabled(index)) return;
+    setFavoriteDraftRanges((items) =>
+      items.map((item, itemIndex) => (itemIndex === index ? { ...item, [field]: value } : item)),
+    );
+    setFavoriteCollapsedRanges((items) => ({ ...items, [index]: false }));
+  }
+
+  function toggleFavoriteOvernightRange(index: number, enabled: boolean) {
+    updateFavoriteRange(index, "end", enabled ? OVERNIGHT_TIME : PLACEHOLDER_TIME);
+    setFavoriteActiveRangeFields((items) => ({ ...items, [index]: "end" }));
+    setFavoriteDialModes((items) => ({ ...items, [`${index}-end`]: "hour" }));
+  }
+
+  function resetFavoriteRange(index: number) {
+    if (isFavoriteSlotDisabled(index)) return;
+    setFavoriteDraftRanges((items) =>
+      items.map((item, itemIndex) => (itemIndex === index ? { ...DEFAULT_RANGE } : item)),
+    );
+    setFavoriteCollapsedRanges((items) => ({ ...items, [index]: false }));
+    setFavoriteDialModes((items) => ({
+      ...items,
+      [`${index}-start`]: "hour",
+      [`${index}-end`]: "hour",
+    }));
+    setFavoriteActiveRangeFields((items) => ({ ...items, [index]: "start" }));
+  }
+
+  function removeFavoriteRange(index: number) {
+    setFavoriteDraftRanges((items) => {
+      const nextFavorites = normalizeFavoriteRanges(items.filter((_, itemIndex) => itemIndex !== index));
+      const nextItems = createFavoriteDraft(nextFavorites);
+      setFavoriteCollapsedRanges(createFavoriteCollapsedState(nextItems));
+      return nextItems;
+    });
+    setFavoriteDialModes({});
+    setFavoriteActiveRangeFields({});
+  }
+
+  function restoreFavoriteRange(index: number) {
+    if (isFavoriteSlotDisabled(index)) return;
+    const savedRange = favoriteRanges[index] ?? DEFAULT_RANGE;
+    setFavoriteDraftRanges((items) =>
+      items.map((item, itemIndex) => (itemIndex === index ? { start: savedRange.start, end: savedRange.end } : item)),
+    );
+    setFavoriteCollapsedRanges((items) => ({ ...items, [index]: isCompleteRange(savedRange) }));
+  }
+
+  function updateFavoriteDialMode(index: number, field: TimeField, mode: "hour" | "minute") {
+    if (isFavoriteSlotDisabled(index)) return;
+    setFavoriteDialModes((items) => ({ ...items, [`${index}-${field}`]: mode }));
+  }
+
+  function updateFavoriteActiveRangeField(index: number, field: TimeField) {
+    if (isFavoriteSlotDisabled(index)) return;
+    setFavoriteActiveRangeFields((items) => ({ ...items, [index]: field }));
+  }
+
+  function confirmFavoriteRange(index: number) {
+    const range = favoriteDraftRanges[index];
+    setFavoriteError("");
+    if (isFavoriteSlotDisabled(index)) {
+      setFavoriteError("Completa el favorito anterior antes de editar este.");
+      return;
+    }
+    if (!range || !isCompleteRange(range)) {
+      setFavoriteError("Completa la hora de inicio y fin antes de confirmar el favorito.");
+      return;
+    }
+    if (!isValidRange(range)) {
+      setFavoriteError("La hora final no puede ser inferior a la de inicio.");
+      return;
+    }
+    setFavoriteCollapsedRanges((items) => ({ ...items, [index]: true }));
+  }
+
+  function editFavoriteRange(index: number) {
+    if (isFavoriteSlotDisabled(index)) {
+      setFavoriteError("Completa el favorito anterior antes de editar este.");
+      return;
+    }
+    setFavoriteError("");
+    setFavoriteCollapsedRanges((items) => ({ ...items, [index]: false }));
+  }
+
+  function cancelFavoriteRangeEdit(index: number) {
+    const savedRange = favoriteRanges[index] ?? DEFAULT_RANGE;
+    setFavoriteError("");
+    setFavoriteDraftRanges((items) =>
+      items.map((item, itemIndex) => (itemIndex === index ? { start: savedRange.start, end: savedRange.end } : item)),
+    );
+    setFavoriteCollapsedRanges((items) => ({ ...items, [index]: true }));
+  }
+
+  async function saveFavoriteRanges() {
+    if (!voterName) return;
+    const nextRanges = normalizeFavoriteRanges(favoriteDraftRanges);
+    const firstEmptyIndex = favoriteDraftRanges.findIndex((range) => !isCompleteRange(range));
+    const hasSkippedFavorite =
+      firstEmptyIndex >= 0 && favoriteDraftRanges.slice(firstEmptyIndex + 1).some(isCompleteRange);
+    if (hasSkippedFavorite) {
+      setFavoriteError("No dejes huecos entre favoritos. Completa primero el anterior.");
+      return;
+    }
+    if (nextRanges.some((range) => !isValidRange(range))) {
+      setFavoriteError("Revisa los favoritos: cada rango debe tener al menos 5 minutos.");
+      return;
+    }
+
+    setFavoriteSaving(true);
+    setFavoriteError("");
+    try {
+      const savedFavorites = await saveAppFavoriteRanges(voterName, nextRanges);
+      setFavoriteRanges(savedFavorites);
+      setFavoriteModalOpen(false);
+    } catch (err) {
+      setFavoriteError(err instanceof Error ? err.message : "No se pudieron guardar los favoritos.");
+    } finally {
+      setFavoriteSaving(false);
+    }
+  }
+
   function unlockAdmin() {
     setAdminError("");
     if (!ADMIN_PIN) {
@@ -1543,7 +1855,7 @@ function App() {
     setAdminDeleting(true);
     setAdminError("");
     try {
-      const cleanSummary = await deleteTodayVotes(adminPin);
+      const cleanSummary = await deleteDayVotesByDate(selectedDate, adminPin);
       setSummary(cleanSummary);
       resetVotingFlow();
       setAdminOpen(false);
@@ -1557,7 +1869,7 @@ function App() {
     }
   }
 
-  const dateLabel = summary ? formatDate(summary.date) : "Hoy";
+  const dateLabel = formatDate(selectedDate);
   const hasPendingDeletedSavedRanges = ranges.some((range, index) => range.deleted && savedRanges[index]);
   const canSave =
     Boolean(voterName) &&
@@ -1565,9 +1877,16 @@ function App() {
     (canPlay === false || ranges.some(isActiveCompleteRange) || (Boolean(currentVote) && hasPendingDeletedSavedRanges));
 
   function shareResultsOnWhatsapp() {
-    if (!summary) return;
-    const message = buildResultsMessage(summary);
+    if (!visibleSummary) return;
+    const message = buildResultsMessage(visibleSummary);
     window.open(`https://api.whatsapp.com/send?text=${encodeURIComponent(message)}`, "_blank", "noopener,noreferrer");
+  }
+
+  function selectDay(day: DayTab) {
+    setSelectedDay(day);
+    setAdminError("");
+    setNotificationNotice("");
+    setError("");
   }
 
   if (!voterName && !adminUnlocked) {
@@ -1586,7 +1905,7 @@ function App() {
   }
 
   return (
-    <main className="app-shell">
+    <main className={`app-shell ${selectedDay === "tomorrow" ? "tomorrow-mode" : ""}`} id="page-top">
       <div className="app-layout">
         <div className="app-main">
           <header className="topbar">
@@ -1604,6 +1923,7 @@ function App() {
                     adminPin={adminPin}
                     adminUnlocked={adminUnlocked}
                     adminConfirming={adminConfirming}
+                    deleteDayLabel={selectedDay === "today" ? "HOY" : "MAÑANA"}
                     onCancelConfirm={() => setAdminConfirming(false)}
                     onDelete={deleteDayVotes}
                     onPinChange={setAdminPin}
@@ -1617,44 +1937,74 @@ function App() {
             </div>
           </header>
 
-          <div className="screen-meta-row">
-            <span>
-              <CalendarDays size={16} />
-              {dateLabel}
-            </span>
-            <button className="secondary-button share-results-button" onClick={shareResultsOnWhatsapp} disabled={!summary || !summary.votes.length}>
+          <nav
+            ref={sectionNavRef}
+            className={`section-nav ${sectionNavStuck ? "is-stuck" : ""} ${sectionNavShareWrapped ? "share-wrapped" : ""}`}
+            aria-label="Secciones"
+          >
+            <a href="#page-top" aria-label="INICIO"><Home size={18} /><span className="section-nav-label">INICIO</span></a>
+            <a href="#day-section" aria-label="DIA"><CalendarDays size={18} /><span className="section-nav-label">DIA</span></a>
+            <a href="#availability-section" aria-label="DISPONIBILIDAD"><Clock3 size={18} /><span className="section-nav-label">DISPONIBILIDAD</span></a>
+            <a href="#votes-section" aria-label="VOTOS"><Vote size={18} /><span className="section-nav-label">VOTOS</span></a>
+            <a href="#matches-section" aria-label="MATCHES"><UsersRound size={18} /><span className="section-nav-label">MATCHES</span></a>
+            <button
+              className="secondary-button share-results-button"
+              onClick={shareResultsOnWhatsapp}
+              disabled={!visibleSummary || !visibleSummary.votes.length}
+            >
               <Share2 size={15} />
               <span>COMPARTIR RESULTADOS</span>
               <WhatsappIcon size={16} />
             </button>
-          </div>
+          </nav>
+
+          <section id="day-section" className="day-section panel">
+            <div className="section-heading">
+              <h2 className="panel-title">DIA</h2>
+            </div>
+            <div className="screen-meta-row">
+              <div className="day-switcher">
+                <button
+                  className="day-toggle-switch"
+                  onClick={() => selectDay(selectedDay === "today" ? "tomorrow" : "today")}
+                  role="switch"
+                  aria-label="Día de votación"
+                  aria-checked={selectedDay === "tomorrow"}
+                >
+                  <strong>{selectedDay === "today" ? "HOY" : "MAÑANA"}</strong>
+                  <span className={`day-toggle-track ${selectedDay === "tomorrow" ? "tomorrow" : ""}`}>
+                    <span />
+                  </span>
+                </button>
+              </div>
+              <span className="selected-date-label">
+                <CalendarDays size={16} />
+                {dateLabel}
+              </span>
+            </div>
+          </section>
 
           <div className={`content-grid ${voterName ? "" : "admin-content-grid"}`}>
             {voterName ? (
-              <section className="space-y-4">
+              <section id="availability-section" className="space-y-4">
                 {voterName ? (
                   <div className="panel vote-panel">
                     <div className="step-block first-step">
                       <h2 className="panel-title step-title">
-                        <span>1</span>
                         DISPONIBILIDAD
+                        <label className="unavailable-checkbox">
+                          <input
+                            type="checkbox"
+                            checked={canPlay === false}
+                            onChange={(event) => setCanPlay(event.target.checked ? false : true)}
+                          />
+                          <span>No puedo</span>
+                        </label>
                       </h2>
-                      <div className="segmented" aria-label="Disponibilidad">
-                        <button className={canPlay === true ? "active" : ""} onClick={() => setCanPlay(true)}>
-                          Puedo jugar
-                        </button>
-                        <button className={canPlay === false ? "active danger" : ""} onClick={() => setCanPlay(false)}>
-                          No puedo
-                        </button>
-                      </div>
                     </div>
 
                   {voterName && canPlay === true ? (
                     <div className="step-block">
-                      <h2 className="panel-title step-title">
-                        <span>2</span>
-                        RANGO HORARIO
-                      </h2>
                       <div className="space-y-4">
                         {ranges.map((range, index) => (
                           <RangeEditor
@@ -1662,7 +2012,7 @@ function App() {
                             key={index}
                             range={range}
                             canRemove
-                            date={summary?.date}
+                            date={selectedDate}
                             onChange={updateRange}
                             onToggleOvernight={toggleOvernightRange}
                             onRemove={removeRange}
@@ -1722,53 +2072,41 @@ function App() {
               </section>
             ) : null}
 
-              <section className="space-y-6">
-                <div className="panel results-panel">
-                  <div className="results-tabs" role="tablist" aria-label="Resultados">
-                    <button
-                      className={resultsTab === "votes" ? "active" : ""}
-                      onClick={() => setResultsTab("votes")}
-                      role="tab"
-                      aria-selected={resultsTab === "votes"}
-                    >
-                      VOTOS
-                    </button>
-                    <button
-                      className={resultsTab === "matches" ? "active" : ""}
-                      onClick={() => setResultsTab("matches")}
-                      role="tab"
-                      aria-selected={resultsTab === "matches"}
-                    >
-                      MATCHES
-                    </button>
-                  </div>
-
-                  {resultsTab === "votes" ? (
-                    <div className="results-tab-panel" role="tabpanel">
+              <section className="results-sections">
+                    <div id="votes-section" className="panel results-tab-panel">
                       <div className="section-heading">
                         <h2 className="panel-title">VOTOS</h2>
                         <div className="result-actions">
-                          <span>{summary?.votes.length ?? 0} confirmaron</span>
+                          <span>{visibleSummary?.votes.length ?? 0} confirmaron</span>
                         </div>
                       </div>
-                      {summary?.suggestions?.length ? (
-                        <div className="range-suggestions">
-                          <h3>SUGERENCIAS</h3>
+                      <div className="range-suggestions favorite-ranges">
+                        <div className="favorite-ranges-heading">
+                          <h3>FAVORITOS</h3>
+                          {voterName ? (
+                            <button className="icon-button small" onClick={openFavoriteEditor} title="Editar favoritos">
+                              <Plus size={16} />
+                            </button>
+                          ) : null}
+                        </div>
+                        {favoriteRanges.length ? (
                           <div>
-                            {summary.suggestions.map((suggestion) => (
+                            {favoriteRanges.map((favorite) => (
                               <button
                                 className="range-chip"
-                                key={`${suggestion.start}-${suggestion.end}`}
-                                onClick={() => addResultRangeToMyVote(suggestion)}
-                                title="Agregar este rango a mi voto"
+                                key={`${favorite.start}-${favorite.end}`}
+                                onClick={() => addResultRangeToMyVote(favorite)}
+                                title="Agregar este favorito a mi voto"
                               >
-                                <strong>{formatRange(suggestion)}</strong>
+                                <strong>{formatRange(favorite)}</strong>
                                 <Plus size={16} />
                               </button>
                             ))}
                           </div>
-                        </div>
-                      ) : null}
+                        ) : (
+                          <p className="empty-state compact">Todavia no tenes favoritos.</p>
+                        )}
+                      </div>
                       <div className="mt-4 grid gap-3">
                         {resultVotes.map((vote) => (
                           <VoteCard
@@ -1781,8 +2119,7 @@ function App() {
                         ))}
                       </div>
                     </div>
-                  ) : (
-                    <div className="results-tab-panel" role="tabpanel">
+                    <div id="matches-section" className="panel results-tab-panel">
                       <div className="section-heading">
                         <h2 className="panel-title">MATCHES</h2>
                         <span>{filteredOverlaps.length} matches</span>
@@ -1811,19 +2148,64 @@ function App() {
                               </span>
                             </div>
                           ))
-                        ) : summary?.overlaps.length ? (
+                        ) : visibleSummary?.overlaps.length ? (
                           <p className="empty-state">No hay coincidencias con ese filtro.</p>
                         ) : (
                           <p className="empty-state">Cuando haya horarios compatibles entre dos o mas personas, apareceran aca.</p>
                         )}
                       </div>
                     </div>
-                  )}
-                </div>
               </section>
           </div>
+          <div aria-hidden="true" className="matches-scroll-tail" style={{ height: `${matchesScrollTail}px` }} />
         </div>
       </div>
+      {favoriteModalOpen ? (
+        <div className="inline-modal favorite-modal" role="dialog" aria-modal="true" aria-label="Editar favoritos">
+          <div className="inline-modal-panel favorite-modal-panel">
+            <div>
+              <h3>EDITAR FAVORITOS</h3>
+              <p>Hasta 4 horarios fijos predeterminados.</p>
+            </div>
+            <div className="favorite-editor-list">
+              {favoriteDraftRanges.map((range, index) => (
+                <RangeEditor
+                  index={index}
+                  key={index}
+                  range={range}
+                  canRemove={isCompleteRange(range)}
+                  date={selectedDate}
+                  onChange={updateFavoriteRange}
+                  onToggleOvernight={toggleFavoriteOvernightRange}
+                  onRemove={removeFavoriteRange}
+                  onRestore={restoreFavoriteRange}
+                  onReset={resetFavoriteRange}
+                  dialModes={favoriteDialModes}
+                  onDialModeChange={updateFavoriteDialMode}
+                  activeField={favoriteActiveRangeFields[index] ?? "start"}
+                  onActiveFieldChange={updateFavoriteActiveRangeField}
+                  collapsed={Boolean(favoriteCollapsedRanges[index])}
+                  onConfirm={confirmFavoriteRange}
+                  onEdit={editFavoriteRange}
+                  onCancel={cancelFavoriteRangeEdit}
+                  label={`Rango Favorito ${index + 1}`}
+                  disabled={isFavoriteSlotDisabled(index)}
+                />
+              ))}
+            </div>
+            {favoriteError ? <p className="error-text">{favoriteError}</p> : null}
+            <div className="inline-modal-actions">
+              <button className="secondary-button" onClick={closeFavoriteEditor} disabled={favoriteSaving}>
+                CANCELAR
+              </button>
+              <button className="primary-button" onClick={saveFavoriteRanges} disabled={favoriteSaving}>
+                {favoriteSaving ? <Loader2 className="animate-spin" size={18} /> : <Save size={18} />}
+                GUARDAR
+              </button>
+            </div>
+          </div>
+        </div>
+      ) : null}
     </main>
   );
 }
@@ -1835,6 +2217,7 @@ function AdminControls({
   adminPin,
   adminUnlocked,
   adminConfirming,
+  deleteDayLabel,
   onCancelConfirm,
   onDelete,
   onPinChange,
@@ -1848,6 +2231,7 @@ function AdminControls({
   adminPin: string;
   adminUnlocked: boolean;
   adminConfirming: boolean;
+  deleteDayLabel: string;
   onCancelConfirm: () => void;
   onDelete: () => void;
   onPinChange: (value: string) => void;
@@ -1880,7 +2264,7 @@ function AdminControls({
             </>
           ) : adminConfirming ? (
             <div className="admin-confirm">
-              <p>Seguro que queres borrar todos los votos de hoy?</p>
+              <p>Seguro que queres borrar todos los votos de {deleteDayLabel.toLowerCase()}?</p>
               <div>
                 <button className="danger-admin-button" onClick={onDelete} disabled={adminDeleting}>
                   {adminDeleting ? <Loader2 className="animate-spin" size={16} /> : <Trash2 size={16} />}
@@ -1894,7 +2278,7 @@ function AdminControls({
           ) : (
             <button className="danger-admin-button" onClick={onRequestDelete} disabled={adminDeleting}>
               <Trash2 size={16} />
-              BORRAR VOTOS DE HOY
+              BORRAR VOTOS DE {deleteDayLabel}
             </button>
           )}
           {adminError ? <p className="admin-error">{adminError}</p> : null}
@@ -1922,6 +2306,8 @@ function RangeEditor({
   onConfirm,
   onEdit,
   onCancel,
+  label,
+  disabled,
 }: {
   index: number;
   range: Range;
@@ -1940,29 +2326,36 @@ function RangeEditor({
   onConfirm: (index: number) => void;
   onEdit: (index: number) => void;
   onCancel: (index: number) => void;
+  label?: string;
+  disabled?: boolean;
 }) {
   const startDate = date ? formatShortDate(date) : "hoy";
   const endDate = date ? formatShortDate(range.end === "24:00" || isOvernightTime(range.end) ? addDays(date, 1) : date) : "hoy";
   const rangeSummary = isCompleteRange(range) ? formatRange(range) : "Sin confirmar";
+  const rangeLabel = label ?? `Rango ${index + 1}`;
 
   if (collapsed) {
     return (
-      <article className={`range-card range-card-collapsed ${range.deleted ? "range-card-deleted" : ""}`}>
-        <button className="range-collapsed-summary" onClick={() => (range.deleted ? onRestore(index) : onEdit(index))}>
-          <span>Rango {index + 1}</span>
+      <article className={`range-card range-card-collapsed ${range.deleted ? "range-card-deleted" : ""} ${disabled ? "range-card-disabled" : ""}`}>
+        <button
+          className="range-collapsed-summary"
+          onClick={() => (range.deleted ? onRestore(index) : onEdit(index))}
+          disabled={disabled}
+        >
+          <span>{rangeLabel}</span>
           <strong>{range.deleted ? `${rangeSummary} - pendiente de eliminar` : rangeSummary}</strong>
         </button>
         <div className="range-actions">
           {range.deleted ? (
-            <button className="icon-button small" onClick={() => onRestore(index)} title="Recuperar rango">
+            <button className="icon-button small" onClick={() => onRestore(index)} title="Recuperar rango" disabled={disabled}>
               <RotateCcw size={15} />
             </button>
           ) : (
             <>
-              <button className="icon-button small" onClick={() => onEdit(index)} title="Editar rango">
+              <button className="icon-button small" onClick={() => onEdit(index)} title="Editar rango" disabled={disabled}>
                 <Pencil size={15} />
               </button>
-              <button className="icon-button small danger-button" onClick={() => onRemove(index)} disabled={!canRemove} title="Quitar rango">
+              <button className="icon-button small danger-button" onClick={() => onRemove(index)} disabled={!canRemove || disabled} title="Quitar rango">
                 <Trash2 size={16} />
               </button>
             </>
@@ -1973,27 +2366,27 @@ function RangeEditor({
   }
 
   return (
-    <article className="range-card">
+    <article className={`range-card ${disabled ? "range-card-disabled" : ""}`}>
       <div className="range-card-header">
-        <strong>Rango {index + 1}</strong>
+        <strong>{rangeLabel}</strong>
         <div className="range-actions">
-          <button className="icon-button small" onClick={() => onReset(index)} title="Resetear rango">
+          <button className="icon-button small" onClick={() => onReset(index)} title="Resetear rango" disabled={disabled}>
             <RotateCcw size={15} />
           </button>
-          <button className="icon-button small danger-button" onClick={() => onRemove(index)} disabled={!canRemove} title="Quitar rango">
+          <button className="icon-button small danger-button" onClick={() => onRemove(index)} disabled={!canRemove || disabled} title="Quitar rango">
             <Trash2 size={16} />
           </button>
         </div>
       </div>
       <div className="range-time-switcher">
-        <button className={activeField === "start" ? "active" : ""} onClick={() => onActiveFieldChange(index, "start")}>
+        <button className={activeField === "start" ? "active" : ""} onClick={() => onActiveFieldChange(index, "start")} disabled={disabled}>
           <span>
             DESDE
             <small>{startDate}</small>
           </span>
           <strong>{range.start}</strong>
         </button>
-        <button className={activeField === "end" ? "active" : ""} onClick={() => onActiveFieldChange(index, "end")}>
+        <button className={activeField === "end" ? "active" : ""} onClick={() => onActiveFieldChange(index, "end")} disabled={disabled}>
           <span>
             HASTA
             <small>{endDate}</small>
@@ -2007,6 +2400,7 @@ function RangeEditor({
             type="checkbox"
             checked={isOvernightTime(range.end)}
             onChange={(event) => onToggleOvernight(index, event.target.checked)}
+            disabled={disabled}
           />
           <span>TRASNOCHE</span>
         </label>
@@ -2022,6 +2416,7 @@ function RangeEditor({
           dialMode={dialModes[`${index}-${activeField}`] ?? "hour"}
           onDialModeChange={(nextMode) => onDialModeChange(index, activeField, nextMode)}
           onChange={(value) => onChange(index, activeField, value)}
+          disabled={disabled}
         />
       )}
       <div className="range-edit-actions with-cancel">
@@ -2029,7 +2424,7 @@ function RangeEditor({
           <X size={17} />
           CANCELAR
         </button>
-        <button className="confirm-range-button" onClick={() => onConfirm(index)}>
+        <button className="confirm-range-button" onClick={() => onConfirm(index)} disabled={disabled}>
           <Check size={17} />
           CONFIRMAR RANGO
         </button>
@@ -2043,11 +2438,13 @@ function TimePicker({
   dialMode,
   onDialModeChange,
   onChange,
+  disabled,
 }: {
   value: string;
   dialMode: "hour" | "minute";
   onDialModeChange: (mode: "hour" | "minute") => void;
   onChange: (value: string) => void;
+  disabled?: boolean;
 }) {
   const { hour: selectedHour, minute: selectedMinute } = splitTime(value);
 
@@ -2071,11 +2468,11 @@ function TimePicker({
   return (
     <div className="time-picker">
       <div className="clock-readout">
-        <button className={dialMode === "hour" ? "active" : ""} onClick={() => onDialModeChange("hour")}>
+        <button className={dialMode === "hour" ? "active" : ""} onClick={() => onDialModeChange("hour")} disabled={disabled}>
           {selectedHour === "HH" ? "HORA" : selectedHour}
         </button>
         <span>:</span>
-        <button className={dialMode === "minute" ? "active" : ""} onClick={() => onDialModeChange("minute")}>
+        <button className={dialMode === "minute" ? "active" : ""} onClick={() => onDialModeChange("minute")} disabled={disabled}>
           {selectedMinute === "MM" ? "MINUTOS" : selectedMinute}
         </button>
         <small>hs</small>
@@ -2102,6 +2499,7 @@ function TimePicker({
                   label={String(Number(hour))}
                   value={hour}
                   selected={selectedHour === hour}
+                  disabled={disabled}
                   index={index}
                   total={OUTER_HOURS.length}
                   radius={36.8}
@@ -2114,6 +2512,7 @@ function TimePicker({
                   label={hour}
                   value={hour}
                   selected={selectedHour === hour}
+                  disabled={disabled}
                   index={index}
                   total={INNER_HOURS.length}
                   radius={24.5}
@@ -2129,7 +2528,7 @@ function TimePicker({
                 label={minute}
                 value={minute}
                 selected={selectedMinute === minute}
-                disabled={selectedHour === "24" && minute !== "00"}
+                disabled={disabled || (selectedHour === "24" && minute !== "00")}
                 index={index}
                 total={MINUTES.length}
                 radius={36.8}

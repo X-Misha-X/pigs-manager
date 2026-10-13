@@ -64,6 +64,10 @@ button {
   color: #f7fffc;
 }
 
+.app-shell.tomorrow-mode {
+  background: #482b48;
+}
+
 .app-layout {
   @apply mx-auto max-w-6xl px-4 pb-8 pt-4;
 }
@@ -315,9 +319,116 @@ button {
 }
 
 .screen-meta-row {
-  @apply mb-5 mt-4 flex flex-wrap items-center justify-between gap-3 text-xs;
+  @apply flex flex-wrap items-center justify-between gap-3 text-xs;
   color: rgba(247, 255, 252, 0.72);
   letter-spacing: 0.045em;
+}
+
+.section-nav {
+  @apply sticky top-0 z-30 mt-4 flex flex-wrap items-center gap-2 border-b pb-3;
+  isolation: isolate;
+  border-color: rgba(164, 236, 212, 0.14);
+  background-color: transparent;
+  backdrop-filter: none;
+  box-shadow: none;
+  transition: background-color 160ms ease, box-shadow 160ms ease, backdrop-filter 160ms ease;
+}
+
+.section-nav.is-stuck {
+  background-color: transparent;
+  backdrop-filter: none;
+  box-shadow: none;
+  padding-top: 12px;
+}
+
+.section-nav.is-stuck::before {
+  position: absolute;
+  z-index: -1;
+  content: "";
+  top: -1rem;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  border-top: 1px solid rgba(164, 236, 212, 0.14);
+  background: rgba(56, 200, 204, 0.17);
+  backdrop-filter: blur(18px);
+  box-shadow: 0 8px 20px rgba(17, 16, 31, 0.18);
+}
+
+.section-nav a {
+  @apply inline-flex shrink-0 items-center gap-2 rounded-md px-3 py-2 text-xs font-semibold tracking-[0.08em] transition;
+  color: rgba(247, 255, 252, 0.64);
+}
+
+.section-nav a > svg {
+  color: var(--magenta);
+  filter: drop-shadow(0 0 5px rgba(255, 79, 216, 0.52));
+}
+
+.section-nav a:hover,
+.section-nav a:focus-visible {
+  outline: none;
+  color: var(--mint);
+  background: rgba(56, 200, 204, 0.14);
+}
+
+.section-nav .share-results-button {
+  @apply ml-auto;
+  margin-right: 1rem;
+  background-color: #1a2b40;
+}
+
+.section-nav .share-results-button:disabled {
+  opacity: 1;
+}
+
+.section-nav.share-wrapped {
+  justify-content: space-evenly;
+}
+
+.section-nav.share-wrapped .share-results-button {
+  width: auto;
+  min-width: 0;
+  margin-left: 1rem;
+  margin-right: 1rem;
+}
+
+@media (max-width: 900px) {
+  .section-nav {
+    justify-content: space-evenly;
+  }
+
+  .section-nav a {
+    @apply h-10 w-10 justify-center p-0;
+  }
+
+  .section-nav-label {
+    display: none;
+  }
+
+  .section-nav .share-results-button {
+    margin-left: 0;
+    margin-right: 0;
+  }
+}
+
+.day-section {
+  @apply mb-5 mt-4 grid gap-3;
+}
+
+.day-section .section-heading {
+  @apply items-center;
+}
+
+.day-section .panel-title {
+  @apply mb-0;
+}
+
+#day-section,
+#availability-section,
+#votes-section,
+#matches-section {
+  scroll-margin-top: 5rem;
 }
 
 .screen-meta-row > span {
@@ -327,38 +438,19 @@ button {
 }
 
 .content-grid {
-  @apply grid gap-5 lg:grid-cols-[minmax(390px,420px)_minmax(0,1fr)];
+  @apply grid gap-5;
 }
 
 .admin-content-grid {
   @apply lg:grid-cols-1;
 }
 
-.results-panel {
-  @apply grid gap-4;
-}
-
-.results-tabs {
-  @apply grid grid-cols-2 rounded-lg border p-1;
-  background: rgba(18, 18, 33, 0.42);
-  border-color: rgba(164, 236, 212, 0.12);
-}
-
-.results-tabs button {
-  @apply h-11 rounded-md text-sm font-semibold uppercase transition;
-  color: rgba(247, 255, 252, 0.58);
-}
-
-.results-tabs button.active {
-  color: var(--mint);
-  background: rgba(56, 200, 204, 0.16);
-  box-shadow:
-    0 0 0 1px rgba(56, 200, 204, 0.42) inset,
-    0 0 16px rgba(56, 200, 204, 0.12);
+.results-sections {
+  @apply grid gap-5;
 }
 
 .results-tab-panel {
-  @apply min-h-[28rem];
+  @apply grid gap-4;
 }
 
 .panel {
@@ -384,6 +476,40 @@ button {
   @apply inline-flex h-6 w-6 items-center justify-center rounded-full text-xs font-bold;
   background: rgba(56, 200, 204, 0.2);
   color: var(--mint);
+}
+
+.unavailable-checkbox {
+  @apply ml-auto inline-flex cursor-pointer items-center gap-2 text-sm font-semibold normal-case tracking-normal;
+  color: rgba(247, 255, 252, 0.88);
+}
+
+.unavailable-checkbox input {
+  @apply relative h-5 w-5 shrink-0 rounded transition;
+  appearance: none;
+  border: 1px solid rgba(164, 236, 212, 0.6);
+  background: rgba(56, 200, 204, 0.16);
+}
+
+.unavailable-checkbox input:checked {
+  border-color: var(--mint);
+  background: rgba(56, 200, 204, 0.86);
+}
+
+.unavailable-checkbox input:checked::after {
+  position: absolute;
+  top: 0.12rem;
+  left: 0.36rem;
+  width: 0.3rem;
+  height: 0.58rem;
+  border: solid #23223d;
+  border-width: 0 2px 2px 0;
+  content: "";
+  transform: rotate(45deg);
+}
+
+.unavailable-checkbox input:focus-visible {
+  outline: 2px solid rgba(164, 236, 212, 0.88);
+  outline-offset: 2px;
 }
 
 .step-block {
@@ -531,6 +657,60 @@ button {
 
 .result-actions {
   @apply flex flex-wrap items-center gap-2;
+}
+
+.day-switcher {
+  @apply flex items-center;
+}
+
+.day-toggle-switch {
+  @apply inline-flex h-10 min-w-28 items-center justify-between gap-4 rounded-md border px-3 text-xs font-semibold transition;
+  border-color: rgba(164, 236, 212, 0.18);
+  background: rgba(255, 255, 255, 0.06);
+  color: rgba(247, 255, 252, 0.72);
+}
+
+.day-toggle-switch:hover {
+  border-color: rgba(56, 200, 204, 0.78);
+  background: rgba(56, 200, 204, 0.18);
+  box-shadow: 0 0 0 1px rgba(56, 200, 204, 0.12) inset;
+}
+
+.day-toggle-switch strong {
+  color: #ffffff;
+}
+
+.day-toggle-track {
+  @apply relative h-5 w-9 rounded-full transition;
+  background: rgba(164, 236, 212, 0.2);
+}
+
+.day-toggle-track > span {
+  @apply absolute left-0.5 top-0.5 h-4 w-4 rounded-full transition;
+  background: var(--mint);
+}
+
+.day-toggle-track.tomorrow {
+  background: rgba(56, 200, 204, 0.5);
+}
+
+.day-toggle-track.tomorrow > span {
+  transform: translateX(1rem);
+}
+
+.selected-date-label {
+  @apply inline-flex h-10 items-center gap-2 rounded-md border px-3 text-sm font-semibold;
+  border-color: rgba(56, 200, 204, 0.6);
+  background: rgba(56, 200, 204, 0.17);
+  color: var(--mint);
+  box-shadow: 0 0 14px rgba(56, 200, 204, 0.12) inset;
+}
+
+.screen-meta-row > .selected-date-label {
+  border-color: rgba(56, 200, 204, 0.6);
+  background: rgba(56, 200, 204, 0.17);
+  color: var(--mint);
+  box-shadow: 0 0 14px rgba(56, 200, 204, 0.12) inset;
 }
 
 .share-results-button {
@@ -877,10 +1057,6 @@ button {
     min-height: auto;
   }
 
-  .results-tabs button {
-    @apply text-xs;
-  }
-
   .overlap-filter {
     @apply grid gap-2;
     grid-template-columns: repeat(4, minmax(0, 1fr));
@@ -1039,6 +1215,15 @@ button {
   text-decoration: line-through;
 }
 
+.range-card-disabled {
+  opacity: 0.46;
+}
+
+.range-card-disabled,
+.range-card-disabled button {
+  cursor: not-allowed;
+}
+
 .range-card-header {
   @apply mb-4 flex items-center justify-between gap-3;
 }
@@ -1150,7 +1335,7 @@ button {
 }
 
 .add-range-button.wide {
-  @apply w-full px-4 text-sm font-semibold;
+  @apply w-fit px-4 text-sm font-semibold;
 }
 
 .add-range-button:hover {
@@ -1546,12 +1731,37 @@ button {
   letter-spacing: 0.08em;
 }
 
+.favorite-ranges-heading {
+  @apply mb-2 flex items-center justify-between gap-3;
+}
+
+.favorite-ranges-heading h3 {
+  @apply mb-0;
+}
+
+.favorite-ranges .empty-state.compact {
+  @apply m-0 py-1 text-sm;
+}
+
 .range-suggestions > div {
   @apply flex flex-wrap gap-2;
 }
 
 .range-suggestions .range-chip {
   @apply cursor-pointer;
+}
+
+.favorite-modal {
+  @apply items-start overflow-y-auto py-6;
+  align-items: start;
+}
+
+.favorite-modal-panel {
+  @apply max-w-2xl;
+}
+
+.favorite-editor-list {
+  @apply grid gap-3;
 }
 
 .overlap-filter {
